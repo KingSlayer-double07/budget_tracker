@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity } from 'react-native';
-import { getPlannedPurchases, markPurchaseAsBought } from './database';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
+import { deletePurchase, getPlannedPurchases, markPurchaseAsBought } from './database';
 
 export default function PlannedPurchasesScreen() {
   const [purchases, setPurchases] = useState([]);
@@ -30,6 +30,7 @@ export default function PlannedPurchasesScreen() {
           data={purchases}
           keyExtractor={(item) => item.id.toString()}
           renderItem={({ item }) => (
+            <View>
             <TouchableOpacity
               onPress={() => handleMarkAsBought(item.id, item.amount, item.item)}
               style={{
@@ -42,9 +43,38 @@ export default function PlannedPurchasesScreen() {
               <Text style={{ fontSize: 16 }}>{item.item} - NGN{item.amount}</Text>
               <Text>{item.purchased ? "✅ Bought" : "🛒 Tap to Buy"}</Text>
             </TouchableOpacity>
+            <TouchableOpacity style={styles.deleteButton} onPress={() => deletePurchase(item.id)}>
+              <Text style={styles.deleteText}>Delete Purchase</Text>
+            </TouchableOpacity>
+            </View>
           )}
         />
       )}
+      <TouchableOpacity style={styles.refreshButton} onPress={() => fetchData()}>
+        <Text>Refresh Page</Text>
+      </TouchableOpacity>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+    deleteButton: { 
+      backgroundColor: "#e91e63", 
+      padding: 10, 
+      borderRadius: 10, 
+      marginBottom: 10,
+      marginTop: -5,
+      alignItems: "center"
+    },
+    refreshButton: { 
+      justifyContent: "center", 
+      backgroundColor: "#fff", 
+      padding: 10, 
+      marginTop: 10, 
+      borderRadius: 10,
+    },
+    deleteText: { 
+      fontSize: 18, 
+      color: "#fff" 
+    }
+})

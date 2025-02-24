@@ -23,21 +23,21 @@ export default function AddPurchaseScreen() {
 
   return (
     <View style={styles.container}>
-      <Text>Item:</Text>
+      <Text style={styles.heading}>Add Purchase</Text>
+
       <TextInput
         value={item}
         onChangeText={setItem}
         placeholder="Enter item name"
-        style={{ borderBottomWidth: 1, marginBottom: 10 }}
+        style={styles.input}
       />
 
-      <Text>Amount:</Text>
       <TextInput
         value={amount}
         onChangeText={setAmount}
         placeholder="Enter amount"
         keyboardType="numeric"
-        style={{ borderBottomWidth: 1, marginBottom: 10 }}
+        style={styles.input}
       />
 
       <View style={styles.buttonContainer}>
@@ -51,6 +51,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
+    justifyContent: 'flex-start',
     backgroundColor: '#f5f5f5',
   },
   buttonContainer: {
@@ -58,5 +59,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     flexWrap: 'wrap',
     marginTop: 10,
-  }
+  },
+  heading: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  input: {
+    backgroundColor: 'white',
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
 });

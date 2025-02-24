@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Button, Alert, StyleSheet, Switch, FlatList } from 'react-native';
+import { View, Text, TextInput, Button, Alert, StyleSheet, Switch, FlatList, TouchableOpacity } from 'react-native';
 import { addIncome, getIncome } from './database';
 import { useRouter } from 'expo-router';
 
@@ -43,7 +43,7 @@ export default function AddIncomeScreen() {
     Alert.alert("Success", "Income added successfully!");
     setAmount('');
     setSource('');
-    router.push('/'); // Navigate back to Dashboard
+    router.back();
   };
 
   return (
@@ -65,7 +65,7 @@ export default function AddIncomeScreen() {
         onChangeText={setAmount}
       />
 
-      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 20 }}>
+      <View style={styles.recurring}>
               <Text>Recurring Monthly</Text>
               <Switch value={isRecurring} onValueChange={setIsRecurring} />
             </View>
@@ -73,21 +73,25 @@ export default function AddIncomeScreen() {
       <Button title="Add Income" onPress={handleAddIncome} />
 
       {income.length === 0 ? (
-              <Text>No income yet.</Text>
-            ) : (
-              <FlatList
-                data={income}
-                keyExtractor={(item) => item.id.toString()}
-                renderItem={({ item }) => (
-                  <View style={styles.incomeBox}>
-                    <Text style={styles.income}>
-                      {item.source} - NGN{item.amount}, {item.date}
-                    </Text>
-                  </View>
-                )}
-                showsVerticalScrollIndicator={false}
-              />
-            )}
+        <Text>No income yet.</Text>
+      ) : (
+            <FlatList
+             data={income}
+             keyExtractor={(item) => item.id.toString()}
+             renderItem={({ item }) => (
+              <View style={styles.incomeBox}>
+               <Text style={styles.income}>
+                {item.source} - NGN{item.amount}
+               </Text>
+               <Text style={styles.timestamp}>{item.date}</Text>
+              </View>
+             )}
+             showsVerticalScrollIndicator={false}
+            />
+          )}
+      <TouchableOpacity style={styles.refreshButton} onPress={() => fetchData()}>
+        <Text>Refresh Page</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -111,6 +115,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 10,
   },
+  recurring: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    marginBottom: 20 
+  },
   incomeBox: { 
     flexDirection: "row", 
     justifyContent: "space-between", 
@@ -123,5 +132,22 @@ const styles = StyleSheet.create({
   income: { 
     fontSize: 16, 
     color: "#333" 
-  }
+  },
+  delete: { 
+    fontSize: 18, 
+    color: "#e91e63" 
+  },
+  timestamp: { 
+    fontSize: 12, 
+    color: "#757575", 
+    marginTop: 15,
+    fontStyle: "italic" 
+  },
+  refreshButton: { 
+    justifyContent: "center", 
+    backgroundColor: "#fff", 
+    padding: 10, 
+    marginTop: 10, 
+    borderRadius: 10,
+  },
 });

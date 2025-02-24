@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TextInput, Button, Switch, Alert, FlatList } from "react-native";
+import { View, Text, TextInput, Button, Switch, Alert, FlatList, StyleSheet, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 import { addExpense, getExpenses } from "./database";
 
@@ -11,13 +11,13 @@ export default function AddExpenseScreen() {
   const router = useRouter();
 
   const fetchData = async () => {
-        const data = await getExpenses();
-        setExpenses(data);
-      };
+    const data = await getExpenses();
+    setExpenses(data);
+  };
     
-      useEffect(() => {
-        fetchData();
-      }, []);
+  useEffect(() => {
+    fetchData();
+  }, []);
   
   // Function to get the first day of the next month
   const getNextMonthDate = () => {
@@ -34,27 +34,29 @@ export default function AddExpenseScreen() {
     const nextDueDate = getNextMonthDate();
 
     const numericAmount = parseFloat(amount);
-        if (isNaN(numericAmount) || numericAmount <= 0) {
-          Alert.alert("Error", "Please enter a valid amount.");
-          return;
-        }
+    if (isNaN(numericAmount) || numericAmount <= 0) {
+      Alert.alert("Error", "Please enter a valid amount.");
+      return;
+    }
 
-        await addExpense(name, numericAmount, isRecurring, nextDueDate);
-        Alert.alert("Success", "Expense added successfully!");
-        setAmount('');
-        setName('');
-        router.push('/'); // Navigate back to Dashboard
+    await addExpense(name, numericAmount, isRecurring, nextDueDate);
+    Alert.alert("Success", "Expense added successfully!");
+    setAmount('');
+    setName('');
+    router.back();
+    fetchData();
   };
 
+
   return (
-    <View style={{ padding: 20 }}>
-      <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 10 }}>Add Expense</Text>
+    <View style={styles.container}>
+      <Text style={styles.heading}>Add Expense</Text>
 
       <TextInput
         placeholder="Expense Name"
         value={name}
         onChangeText={setName}
-        style={{ borderBottomWidth: 1, marginBottom: 15, padding: 8 }}
+        style={styles.input}
       />
 
       <TextInput
@@ -62,10 +64,10 @@ export default function AddExpenseScreen() {
         value={amount}
         onChangeText={setAmount}
         keyboardType="numeric"
-        style={{ borderBottomWidth: 1, marginBottom: 15, padding: 8 }}
+        style={styles.input}
       />
 
-      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 20 }}>
+      <View style={styles.recurring}>
         <Text>Recurring Monthly</Text>
         <Switch value={isRecurring} onValueChange={setIsRecurring} />
       </View>
@@ -73,24 +75,81 @@ export default function AddExpenseScreen() {
       <Button title="Save Expense" onPress={handleSaveExpense} />
 
       {expenses.length === 0 ? (
-                    <Text>No Expense yet.</Text>
-                  ) : (
-                    <FlatList
-                      data={expenses}
-                      keyExtractor={(item) => item.id.toString()}
-                      renderItem={({ item }) => (
-                          <Text style={{ 
-                            fontSize: 16,
-                            padding: 15,
-                            backgroundColor: '#90ee90',
-                            margin: 10,
-                            borderRadius: 10,
-                            flexWrap: "wrap"
-                          }}>Expense:{item.item} - NGN{item.amount} Date:{item.date}</Text>
-                      )}
-                    />
-                  )}
+        <Text>No Expense yet.</Text>
+      ) : (
+            <FlatList
+              data={expenses}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={({ item }) => (
+                <View style={styles.expenseBox}>
+                  <Text style={styles.expense}>
+                    Expense:{item.item} - NGN{item.amount}
+                  </Text>
+                  <Text style={styles.timestamp}>Date:{item.date}</Text>
+                </View>
+              )}
+            />
+          )}
+      <TouchableOpacity style={styles.refreshButton} onPress={() => fetchData()}>
+        <Text>Refresh Page</Text>
+      </TouchableOpacity>
     </View>
   );
 
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20,
+    justifyContent: 'flex-start',
+    backgroundColor: '#f4f4f4',
+  },
+  heading: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  input: {
+    backgroundColor: 'white',
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  recurring: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    marginBottom: 20 
+  },
+  expenseBox: { 
+    flexDirection: "row", 
+    justifyContent: "space-between", 
+    backgroundColor: "#fff", 
+    padding: 10, 
+    marginTop: 10, 
+    borderRadius: 10,
+    flexWrap: "wrap"
+  },
+  refreshButton: { 
+    justifyContent: "center", 
+    backgroundColor: "#fff", 
+    padding: 10, 
+    marginTop: 10, 
+    borderRadius: 10,
+  },
+  expense: { 
+    fontSize: 16, 
+    color: "#333" 
+  },
+  delete: { 
+    fontSize: 18, 
+    color: "#e91e63" 
+  },
+  timestamp: { 
+    fontSize: 12, 
+    color: "#757575", 
+    marginTop: 15,
+    fontStyle: "italic" 
+  }
+});

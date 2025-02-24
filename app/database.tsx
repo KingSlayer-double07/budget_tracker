@@ -42,9 +42,6 @@ const setupDatabase = async () => {
       );`
     );
 
-    
-      
-
     await db.execAsync(
       `CREATE TABLE IF NOT EXISTS savings (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -213,6 +210,31 @@ export const addExpense = async (item: string, amount: number,  isRecurring: boo
   }
   
 };
+
+export const deletePurchase = async (key: number) => {
+  try {
+    Alert.alert(
+      "Delete Purchase",
+      "Are you sure you want to delete this record? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Yes, Delete", onPress: async () => {
+          if (!db) return;
+          await db.runAsync(
+            `DELETE FROM planned_purchases WHERE id = ?;`, 
+            [key]
+          );
+          console.log(`Purchase with ID ${key} deleted successfully`);
+          Alert.alert("Success", "Purchase deleted successfully");
+          } 
+        },
+      ]
+    );
+  } catch (error) {
+    Alert.alert("Error", "Unable to delete data");
+    console.error("Database Error:", error);
+  }
+};
   
 export const handleRecurringUpdates = async () => {
   const today = new Date();
@@ -271,6 +293,7 @@ export const resetDatabase = async () => {
     console.error(error);
   }
 };
+
  
 
 // Export functions for database access

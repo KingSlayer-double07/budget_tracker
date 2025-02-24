@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, Button, ScrollView, RefreshControl, TouchableOpacity  } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity  } from 'react-native';
 import { useRouter } from "expo-router";
 import { getTotalIncome, getTotalExpenses, getBalance, resetDatabase } from './database';
 
@@ -13,10 +13,6 @@ export default function Index() {
   const [refreshing, setRefreshing] = useState(false);
   
   
-  const balanceChecker = async () =>{
-    const balanceAmount = await getBalance();
-    setBalanceCheck(balanceAmount);
-  }
 
   const fetchData = async () => {
     const totalIncome = await getTotalIncome();
@@ -26,11 +22,11 @@ export default function Index() {
     setIncome(parseFloat(totalIncome.toFixed(2)).toLocaleString());
     setExpenses(parseFloat(totalExpenses.toFixed(2)).toLocaleString());
     setBalance(parseFloat(balanceAmount.toFixed(2)).toLocaleString());
+    setBalanceCheck(balanceAmount);
   };
 
   useEffect(() => {
     fetchData();
-    balanceChecker();
   }, []);
 
   //pul-to-refresh function
@@ -82,10 +78,10 @@ export default function Index() {
 
       <View style={styles.buttonContainer}>
         <TouchableOpacity style={styles.button} onPress={() => router.push('/addIncomeScreen')}>
-          <Text style={styles.buttonText}>Add Income</Text>
+          <Text style={styles.buttonText}>Manage Income</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.button} onPress={() => router.push('/addExpenseScreen')}>
-          <Text style={styles.buttonText}>Add Expense</Text>
+          <Text style={styles.buttonText}>Manage Expense</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.button} onPress={() => router.push('/addPurchaseScreen')}>
           <Text style={styles.buttonText}>Manage Purchases</Text>

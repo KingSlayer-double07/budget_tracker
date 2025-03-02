@@ -14,6 +14,7 @@ export default function PlannedPurchasesScreen() {
     fetchData();
   }, []);
 
+  //function to handle the process of marking a purchase as bought
   const handleMarkAsBought = async (id: number, amount: number, item: string) => {
     await markPurchaseAsBought(id, amount, item);
     fetchData(); // Refresh the list
@@ -21,7 +22,7 @@ export default function PlannedPurchasesScreen() {
 
   return (
     <View style={{ padding: 20 }}>
-      <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 10 }}>Planned Purchases</Text>
+      <Text style={styles.heading}>Planned Purchases</Text>
 
       {purchases.length === 0 ? (
         <Text>No planned purchases yet.</Text>
@@ -33,12 +34,7 @@ export default function PlannedPurchasesScreen() {
             <View>
             <TouchableOpacity
               onPress={() => handleMarkAsBought(item.id, item.amount, item.item)}
-              style={{
-                padding: 15,
-                backgroundColor: item.purchased ? '#d3d3d3' : '#90ee90',
-                marginBottom: 10,
-                borderRadius: 10,
-              }}
+              style={styles.purchase}
             >
               <Text style={{ fontSize: 16 }}>{item.item} - NGN{item.amount}</Text>
               <Text>{item.purchased ? "✅ Bought" : "🛒 Tap to Buy"}</Text>
@@ -59,7 +55,18 @@ export default function PlannedPurchasesScreen() {
 }
 
 const styles = StyleSheet.create({
-    deleteButton: { 
+  heading: { 
+    fontSize: 20, 
+    fontWeight: 'bold', 
+    marginBottom: 10 
+  },
+  purchase: {
+    padding: 15,
+    backgroundColor: item.purchased ? '#d3d3d3' : '#90ee90',
+    marginBottom: 10,
+    borderRadius: 10,
+  },
+  deleteButton: { 
       backgroundColor: "#e91e63", 
       padding: 10, 
       borderRadius: 10, 

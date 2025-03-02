@@ -44,6 +44,7 @@ export default function AddPurchaseScreen() {
         <Button title="Add Purchase" onPress={handleAddPurchase} />
         <Button title="View Purchases" onPress={() => router.push('/plannedPurchasesScreen')} />
       </View>
+      <Text style={styles.watermark}>Made by Slayer</Text>
     </View>
   );
 }
@@ -72,4 +73,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 10,
   },
+  watermark: {
+    position: 'static',
+    bottom: 10,
+    right: 10,
+    fontSize: 12,
+    color: 'rgba(0, 0, 0, 0.3)', // Faded text
+  }
 });

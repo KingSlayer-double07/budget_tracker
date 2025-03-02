@@ -92,6 +92,7 @@ export default function AddIncomeScreen() {
       <TouchableOpacity style={styles.refreshButton} onPress={() => fetchData()}>
         <Text>Refresh Page</Text>
       </TouchableOpacity>
+      <Text style={styles.watermark}>Made by Slayer</Text>
     </View>
   );
 }
@@ -150,4 +151,11 @@ const styles = StyleSheet.create({
     marginTop: 10, 
     borderRadius: 10,
   },
+  watermark: {
+    position: 'static',
+    bottom: 10,
+    right: 10,
+    fontSize: 12,
+    color: 'rgba(0, 0, 0, 0.3)', // Faded text
+  }
 });

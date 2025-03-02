@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity  } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Platform, Alert } from 'react-native';
 import { useRouter } from "expo-router";
 import { getTotalIncome, getTotalExpenses, getBalance, resetDatabase } from './database';
+import * as Notifications from 'expo-notifications';
+
 
 
 export default function Index() {
@@ -90,6 +92,7 @@ export default function Index() {
           <Text style={styles.buttonText}>Delete Database</Text>
         </TouchableOpacity>
       </View>
+      <Text style={styles.watermark}>Made by Slayer</Text>
     </ScrollView>
   );
 }
@@ -167,4 +170,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 10,
   },
+  watermark: {
+    position: 'static',
+    bottom: 10,
+    right: 10,
+    fontSize: 12,
+    color: 'rgba(0, 0, 0, 0.3)', // Faded text
+  }
 });

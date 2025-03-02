@@ -53,6 +53,7 @@ export default function PlannedPurchasesScreen() {
       <TouchableOpacity style={styles.refreshButton} onPress={() => fetchData()}>
         <Text>Refresh Page</Text>
       </TouchableOpacity>
+      <Text style={styles.watermark}>Made by Slayer</Text>
     </View>
   );
 }
@@ -76,5 +77,12 @@ const styles = StyleSheet.create({
     deleteText: { 
       fontSize: 18, 
       color: "#fff" 
+    },
+    watermark: {
+      position: 'static',
+      bottom: 10,
+      right: 10,
+      fontSize: 12,
+      color: 'rgba(0, 0, 0, 0.3)', // Faded text
     }
 })

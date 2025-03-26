@@ -2,14 +2,16 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, Switch, FlatList, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useBudget } from './context/BudgetContext';
+import { NotificationService } from './services/NotificationService';
 
 export default function AddExpenseScreen() {
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [isRecurring, setIsRecurring] = useState(false);
+  const [recurringDate, setRecurringDate] = useState('');
   const router = useRouter();
   const { expenseList, isLoading, error, addNewExpense, refreshData } = useBudget();
-
+  
   // Function to get the first day of the next month
   const getNextMonthDate = () => {
     const today = new Date();
@@ -28,16 +30,34 @@ export default function AddExpenseScreen() {
       return;
     }
 
-    const nextDueDate = getNextMonthDate();
-    const success = await addNewExpense(name.trim(), numericAmount, isRecurring, nextDueDate);
-    
-    if (success) {
-      setName('');
-      setAmount('');
-      setIsRecurring(false);
-      Alert.alert("Success", "Expense added successfully!");
-    } else {
-      Alert.alert("Error", "Failed to add expense. Please try again.");
+    try {
+      const success = await addNewExpense(name.trim(), numericAmount, isRecurring, recurringDate);
+      
+      if (success) {
+        // Schedule notification for recurring expense if enabled
+        if (isRecurring && recurringDate) {
+          const notificationService = NotificationService.getInstance();
+          const [year, month] = recurringDate.split('-');
+          const notificationDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+          
+          await notificationService.scheduleRecurringTransaction(
+            'Recurring Expense Due',
+            `Your recurring expense of NGN${numericAmount.toLocaleString()} for ${name} is due`,
+            notificationDate,
+            `recurring-expense-${name}-${recurringDate}`
+          );
+        }
+
+        setName('');
+    setAmount('');
+        setIsRecurring(false);
+        setRecurringDate('');
+        Alert.alert("Success", "Expense added successfully!");
+      } else {
+        Alert.alert("Error", "Failed to add expense. Please try again.");
+      }
+    } catch (error) {
+      Alert.alert("Error", "An unexpected error occurred. Please try again.");
     }
   };
 
@@ -85,6 +105,19 @@ export default function AddExpenseScreen() {
         <Switch value={isRecurring} onValueChange={setIsRecurring} />
       </View>
 
+      {isRecurring && (
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Recurring Date (YYYY-MM)</Text>
+          <TextInput
+            style={styles.input}
+            value={recurringDate}
+            onChangeText={setRecurringDate}
+            placeholder="e.g., 2024-03"
+            placeholderTextColor="#666"
+          />
+        </View>
+      )}
+
       <TouchableOpacity style={styles.addButton} onPress={handleSaveExpense}>
         <Text style={styles.addButtonText}>Add Expense</Text>
       </TouchableOpacity>
@@ -94,22 +127,22 @@ export default function AddExpenseScreen() {
       {expenseList.length === 0 ? (
         <Text style={styles.emptyText}>No expenses recorded yet.</Text>
       ) : (
-        <FlatList
+            <FlatList
           data={expenseList}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => (
-            <View style={styles.expenseBox}>
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={({ item }) => (
+                <View style={styles.expenseBox}>
               <View style={styles.expenseContent}>
                 <Text style={styles.expenseName}>{item.item}</Text>
                 <Text style={styles.expenseAmount}>NGN{item.amount.toLocaleString()}</Text>
               </View>
               <Text style={styles.timestamp}>{item.date}</Text>
-            </View>
-          )}
+                </View>
+              )}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContainer}
-        />
-      )}
+            />
+          )}
     </View>
   );
 }
@@ -168,7 +201,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  recurring: {
+  recurring: { 
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -212,7 +245,7 @@ const styles = StyleSheet.create({
   listContainer: {
     paddingBottom: 20,
   },
-  expenseBox: {
+  expenseBox: { 
     backgroundColor: 'white',
     padding: 15,
     borderRadius: 8,
@@ -230,7 +263,7 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   expenseName: {
-    fontSize: 16,
+    fontSize: 16, 
     color: '#333',
     fontWeight: '600',
   },
@@ -239,8 +272,8 @@ const styles = StyleSheet.create({
     color: '#dc3545',
     fontWeight: 'bold',
   },
-  timestamp: {
-    fontSize: 12,
+  timestamp: { 
+    fontSize: 12, 
     color: '#757575',
     fontStyle: 'italic',
   },
@@ -249,5 +282,13 @@ const styles = StyleSheet.create({
     color: '#757575',
     fontSize: 16,
     marginTop: 20,
+  },
+  inputContainer: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 16,
+    color: '#333',
+    marginBottom: 8,
   },
 });

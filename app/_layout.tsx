@@ -2,10 +2,10 @@ import { Stack } from "expo-router";
 import { useEffect } from "react";
 import { handleRecurringUpdates, initializeDatabase } from "./database";
 import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
-import { StatusBar } from "expo-status-bar";
 import { BudgetProvider } from './context/BudgetContext';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet } from 'react-native';
+import { NotificationService } from './services/NotificationService';
 
 export default function RootLayout() {
 
@@ -15,12 +15,42 @@ export default function RootLayout() {
     };
     initializeDB();
     handleRecurringUpdates();
+
+    const initializeNotifications = async () => {
+      try {
+        const notificationService = NotificationService.getInstance();
+        await notificationService.initialize();
+
+        // Set up notification listeners
+        const notificationListener = notificationService.addNotificationListener(
+          (notification) => {
+            console.log('Received notification:', notification);
+          }
+        );
+
+        const responseListener = notificationService.addNotificationResponseListener(
+          (response) => {
+            console.log('Notification response:', response);
+          }
+        );
+
+        // Cleanup listeners on unmount
+        return () => {
+          notificationService.removeNotificationListener(notificationListener);
+          notificationService.removeNotificationListener(responseListener);
+        };
+      } catch (error) {
+        console.error('Failed to initialize notifications:', error);
+      }
+    };
+
+    initializeNotifications();
   }, []);
 
   return (
     <GestureHandlerRootView style={styles.container}>
       <BudgetProvider>
-        <Stack>
+          <Stack>
           <Stack.Screen
             name="index"
             options={{
@@ -39,6 +69,7 @@ export default function RootLayout() {
                 backgroundColor: '#043927',
               },
               headerTintColor: '#fff',
+              animation: 'slide_from_right',
             }}
           />
           <Stack.Screen
@@ -49,6 +80,7 @@ export default function RootLayout() {
                 backgroundColor: '#043927',
               },
               headerTintColor: '#fff',
+              animation: 'slide_from_right',
             }}
           />
           <Stack.Screen
@@ -58,7 +90,8 @@ export default function RootLayout() {
               headerStyle: {
                 backgroundColor: '#043927',
               },
-              headerTintColor: '#000',
+              headerTintColor: '#fff',
+              animation: 'slide_from_right',
             }}
           />
           <Stack.Screen
@@ -69,9 +102,10 @@ export default function RootLayout() {
                 backgroundColor: '#043927',
               },
               headerTintColor: '#fff',
+              animation: 'flip',
             }}
           />
-        </Stack>
+          </Stack>
       </BudgetProvider>
     </GestureHandlerRootView>
   );

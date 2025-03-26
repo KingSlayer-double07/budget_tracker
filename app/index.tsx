@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from "expo-router";
 import { useBudget } from './context/BudgetContext';
+import { NotificationService } from './services/NotificationService';
 
 export default function Index() {
   const router = useRouter();
@@ -21,6 +22,16 @@ export default function Index() {
     await refreshData();
     setRefreshing(false);
   }, [refreshData]);
+
+  const testNotification = async () => {
+    try {
+      const notificationService = NotificationService.getInstance();
+      await notificationService.testNotification();
+      Alert.alert('Success', 'Test notification scheduled! You should receive it now.');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to schedule test notification. Please check your notification permissions.');
+    }
+  };
 
   if (isLoading) {
     return (
@@ -73,6 +84,9 @@ export default function Index() {
         </TouchableOpacity>
         <TouchableOpacity style={styles.button} onPress={() => router.push('/addPurchaseScreen')}>
           <Text style={styles.buttonText}>Manage Purchases</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.button, styles.testButton]} onPress={testNotification}>
+          <Text style={styles.buttonText}>Test Notification</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -163,5 +177,8 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
-  }
+  },
+  testButton: {
+    backgroundColor: '#6c757d',
+  },
 });

@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
   },
   purchase: {
     padding: 15,
-    backgroundColor: item.purchased ? '#d3d3d3' : '#90ee90',
+    backgroundColor: '#90ee90',
     marginBottom: 10,
     borderRadius: 10,
   },

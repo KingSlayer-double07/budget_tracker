@@ -3,8 +3,40 @@ import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, P
 import { useRouter } from "expo-router";
 import { getTotalIncome, getTotalExpenses, getBalance, resetDatabase } from './database';
 import * as Notifications from 'expo-notifications';
+import * as TaskManager from 'expo-task-manager';
 
+// Background Task Name
+const NOTIFICATION_TASK = "DAILY_NOTIFICATION_TASK";
 
+// Register Background Task
+TaskManager.defineTask(NOTIFICATION_TASK, async () => {
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: "Daily Balance Reminder",
+      body: "Check your current balance in the app!",
+      sound: true,
+    },
+    trigger: { hour: 9, minute: 0, repeats: true },
+  });
+});
+
+// Request Permissions & Schedule Notification
+const scheduleDailyNotification = async () => {
+  const { status } = await Notifications.requestPermissionsAsync();
+  if (status !== "granted") {
+    Alert.alert("Permission required", "Please enable notifications in settings.");
+    return;
+  }
+
+  // Cancel existing notifications to avoid duplicates
+  await Notifications.cancelAllScheduledNotificationsAsync();
+
+  // Ensure the task is registered
+  await Notifications.registerTaskAsync(NOTIFICATION_TASK);
+
+  Alert.alert("Scheduled", "Daily notification set for 9 AM!");
+  console.log("Notification Scheduled");
+};
 
 export default function Index() {
   const [income, setIncome] = useState("");
@@ -31,6 +63,39 @@ export default function Index() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    const requestPermissions = async () => {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission required", "Please enable notifications in settings.");
+      }
+      if (status === "granted") console.log("Permission granted");
+    };
+    requestPermissions();
+  }, []);
+
+  const sendTestNotification = async () => {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "Test Notification",
+        body: "This is a test notification from your app!",
+        sound: true,
+      },
+      trigger: null, // Send immediately
+    });
+    console.log("Notification Sent");
+    scheduleDailyNotification();
+  };
+
+  const dailyNotification = async () => {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "Current Balance",
+        body: ""
+      }
+    })
+  }
+  
   //pul-to-refresh function
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -92,7 +157,9 @@ export default function Index() {
           <Text style={styles.buttonText}>Delete Database</Text>
         </TouchableOpacity>
       </View>
-      <Text style={styles.watermark}>Made by Slayer</Text>
+      <TouchableOpacity style={styles.watermark} onPress={sendTestNotification}>
+        <Text>Made by Slayer</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }

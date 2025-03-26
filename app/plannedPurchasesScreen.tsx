@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Animated } from 'react-native';
 import { useBudget } from './context/BudgetContext';
 import { Swipeable } from 'react-native-gesture-handler';
+import { clearPlannedPurchasesTable } from './database';
 
 export default function PlannedPurchasesScreen() {
   const { 
@@ -43,6 +44,37 @@ export default function PlannedPurchasesScreen() {
             }
           }
         }
+      ]
+    );
+  };
+
+  const handleClearPurchases = async () => {
+    Alert.alert(
+      'Clear Planned Purchases',
+      'Are you sure you want to clear all planned purchases? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Clear Purchases',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const success = await clearPlannedPurchasesTable();
+              if (success) {
+                await refreshData();
+                Alert.alert('Success', 'All planned purchases have been cleared');
+              } else {
+                Alert.alert('Error', 'Failed to clear planned purchases');
+              }
+            } catch (error) {
+              console.error('Error clearing planned purchases:', error);
+              Alert.alert('Error', 'Failed to clear planned purchases');
+            }
+          },
+        },
       ]
     );
   };
@@ -121,7 +153,16 @@ export default function PlannedPurchasesScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.heading}>Planned Purchases</Text>
+      <View style={styles.listHeader}>
+        <Text style={styles.heading}>Planned Purchases</Text>
+        <TouchableOpacity 
+          style={[styles.clearButton, plannedPurchases.length === 0 && styles.clearButtonDisabled]} 
+          onPress={handleClearPurchases}
+          disabled={plannedPurchases.length === 0}
+        >
+          <Text style={styles.clearButtonText}>Clear All</Text>
+        </TouchableOpacity>
+      </View>
 
       {plannedPurchases.length === 0 ? (
         <Text style={styles.emptyText}>No planned purchases yet.</Text>
@@ -256,5 +297,25 @@ const styles = StyleSheet.create({
     color: '#757575',
     fontSize: 16,
     marginTop: 20,
+  },
+  listHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  clearButton: {
+    backgroundColor: '#dc3545',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 5,
+  },
+  clearButtonDisabled: {
+    backgroundColor: '#dc354580',
+  },
+  clearButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });

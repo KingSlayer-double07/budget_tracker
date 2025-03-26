@@ -3,6 +3,7 @@ import { View, Text, TextInput, StyleSheet, Switch, FlatList, TouchableOpacity, 
 import { useRouter } from 'expo-router';
 import { useBudget } from './context/BudgetContext';
 import { NotificationService } from './services/NotificationService';
+import { clearExpensesTable } from './database';
 
 export default function AddExpenseScreen() {
   const [name, setName] = useState('');
@@ -37,13 +38,22 @@ export default function AddExpenseScreen() {
         // Schedule notification for recurring expense if enabled
         if (isRecurring && recurringDate) {
           const notificationService = NotificationService.getInstance();
-          const [year, month] = recurringDate.split('-');
-          const notificationDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+          const day = parseInt(recurringDate);
+          
+          // Create a date for the next occurrence
+          const nextDate = new Date();
+          nextDate.setDate(day);
+          nextDate.setHours(7, 0, 0, 0); // Set to 7:00 AM
+          
+          // If the day has already passed this month, schedule for next month
+          if (nextDate < new Date()) {
+            nextDate.setMonth(nextDate.getMonth() + 1);
+          }
           
           await notificationService.scheduleRecurringTransaction(
             'Recurring Expense Due',
-            `Your recurring expense of NGN${numericAmount.toLocaleString()} for ${name} is due`,
-            notificationDate,
+            `Your recurring expense of NGN${numericAmount.toLocaleString()} for ${name} is due next on ${nextDate.toLocaleDateString()}`,
+            nextDate,
             `recurring-expense-${name}-${recurringDate}`
           );
         }
@@ -59,6 +69,37 @@ export default function AddExpenseScreen() {
     } catch (error) {
       Alert.alert("Error", "An unexpected error occurred. Please try again.");
     }
+  };
+
+  const handleClearExpenses = async () => {
+    Alert.alert(
+      'Clear Expense Data',
+      'Are you sure you want to clear all expense data? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Clear Expenses',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const success = await clearExpensesTable();
+              if (success) {
+                await refreshData();
+                Alert.alert('Success', 'All expense data has been cleared');
+              } else {
+                Alert.alert('Error', 'Failed to clear expense data');
+              }
+            } catch (error) {
+              console.error('Error clearing expense data:', error);
+              Alert.alert('Error', 'Failed to clear expense data');
+            }
+          },
+        },
+      ]
+    );
   };
 
   if (isLoading) {
@@ -107,14 +148,16 @@ export default function AddExpenseScreen() {
 
       {isRecurring && (
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Recurring Date (YYYY-MM)</Text>
+          <Text style={styles.label}>Recurring Date (Day of Month)</Text>
           <TextInput
             style={styles.input}
             value={recurringDate}
             onChangeText={setRecurringDate}
-            placeholder="e.g., 2024-03"
+            placeholder="e.g., 15"
+            keyboardType="numeric"
             placeholderTextColor="#666"
           />
+          <Text style={styles.hint}>Enter a day between 1 and 31</Text>
         </View>
       )}
 
@@ -122,27 +165,36 @@ export default function AddExpenseScreen() {
         <Text style={styles.addButtonText}>Add Expense</Text>
       </TouchableOpacity>
 
-      <Text style={styles.listHeading}>Expense History</Text>
+      <View style={styles.listHeader}>
+        <Text style={styles.listHeading}>Expense History</Text>
+        <TouchableOpacity 
+          style={[styles.clearButton, expenseList.length === 0 && styles.clearButtonDisabled]} 
+          onPress={handleClearExpenses}
+          disabled={expenseList.length === 0}
+        >
+          <Text style={styles.clearButtonText}>Clear All</Text>
+        </TouchableOpacity>
+      </View>
       
       {expenseList.length === 0 ? (
         <Text style={styles.emptyText}>No expenses recorded yet.</Text>
       ) : (
-            <FlatList
+        <FlatList
           data={expenseList}
-              keyExtractor={(item) => item.id.toString()}
-              renderItem={({ item }) => (
-                <View style={styles.expenseBox}>
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item }) => (
+            <View style={styles.expenseBox}>
               <View style={styles.expenseContent}>
                 <Text style={styles.expenseName}>{item.item}</Text>
                 <Text style={styles.expenseAmount}>NGN{item.amount.toLocaleString()}</Text>
               </View>
               <Text style={styles.timestamp}>{item.date}</Text>
-                </View>
-              )}
+            </View>
+          )}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContainer}
-            />
-          )}
+        />
+      )}
     </View>
   );
 }
@@ -290,5 +342,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
     marginBottom: 8,
+  },
+  hint: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  listHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  clearButton: {
+    backgroundColor: '#dc3545',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 5,
+  },
+  clearButtonDisabled: {
+    backgroundColor: '#dc354580',
+  },
+  clearButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });

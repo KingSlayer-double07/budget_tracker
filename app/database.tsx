@@ -2,6 +2,8 @@ import * as SQLite from 'expo-sqlite';
 import * as FileSystem from 'expo-file-system';
 import { Alert } from 'react-native';
 import { router } from 'expo-router';
+import { SecureStorageService } from './services/SecureStorageService';
+import { NotificationService } from './services/NotificationService';
 
 // Database types
 interface Income {
@@ -82,16 +84,28 @@ const validateDate = (date: string): ValidationResult => {
 };
 
 const validateRecurringDate = (date: string): ValidationResult => {
-  const dateObj = new Date(date);
-  if (isNaN(dateObj.getTime())) {
-    return { isValid: false, error: "Invalid recurring date format" };
+  if (!date) {
+    return { isValid: true, error: "" };
   }
-  // Ensure the date is in YYYY-MM format
-  const dateRegex = /^\d{4}-\d{2}$/;
-  if (!dateRegex.test(date)) {
-    return { isValid: false, error: "Recurring date must be in YYYY-MM format" };
+
+  // For monthly recurring transactions, date should be in format "DD"
+  const dayPattern = /^([1-9]|0[1-9]|[12][0-9]|3[01])$/;
+  if (!dayPattern.test(date)) {
+    return { 
+      isValid: false, 
+      error: "Recurring date must be a valid day of the month (1-31)" 
+    };
   }
-  return { isValid: true };
+
+  const day = parseInt(date);
+  if (day < 1 || day > 31) {
+    return { 
+      isValid: false, 
+      error: "Recurring date must be between 1 and 31" 
+    };
+  }
+
+  return { isValid: true, error: "" };
 };
 
 // Database configuration
@@ -387,6 +401,23 @@ export const addExpense = async (
       [item.trim(), amount, date, isRecurring ? 1 : 0, recurringDate]
     );
     
+    // Check budget threshold immediately after adding expense
+    const totalExpenses = await getTotalExpenses();
+    const secureStorage = SecureStorageService.getInstance();
+    const threshold = await secureStorage.getSecureItem('budget_threshold');
+    
+    if (threshold) {
+      const thresholdAmount = parseFloat(threshold);
+      if (totalExpenses >= thresholdAmount) {
+        const notificationService = NotificationService.getInstance();
+        await notificationService.scheduleBudgetAlert(
+          'Budget Limit Alert',
+          `You have reached ${thresholdAmount.toLocaleString()} NGN in expenses`,
+          thresholdAmount
+        );
+      }
+    }
+    
     console.log(`Expense added: ${item}, ${amount}`);
     Alert.alert("Success", "Expense added successfully!");
     router.back();
@@ -407,17 +438,17 @@ export const deletePurchase = async (key: number): Promise<boolean> => {
 
 export const handleRecurringUpdates = async () => {
   const today = new Date();
-  const currentMonth = today.getFullYear() + '-' + (today.getMonth() + 1);
+  const currentDay = today.getDate();
 
   // Process recurring income
   try {
     if (!db) return;
     const recurringIncome = await db.getAllAsync<Income>('SELECT * FROM income WHERE is_recurring = 1');
     for (const income of recurringIncome) {
-      if (!income.recurring_date || !income.recurring_date.startsWith(currentMonth)) {
+      if (income.recurring_date && parseInt(income.recurring_date) === currentDay) {
         await db.runAsync(
           'INSERT INTO income (amount, source, date, is_recurring, recurring_date) VALUES (?, ?, ?, ?, ?)',
-          [income.amount, income.source, today.toISOString().split('T')[0], 1, currentMonth]
+          [income.amount, income.source, today.toISOString().split('T')[0], 1, income.recurring_date]
         );
       }
     }
@@ -426,10 +457,10 @@ export const handleRecurringUpdates = async () => {
     if (!db) return;
     const recurringExpenses = await db.getAllAsync<Expense>('SELECT * FROM expenses WHERE is_recurring = 1');
     for (const expense of recurringExpenses) {
-      if (!expense.recurring_date || !expense.recurring_date.startsWith(currentMonth)) {
+      if (expense.recurring_date && parseInt(expense.recurring_date) === currentDay) {
         await db.runAsync(
           'INSERT INTO expenses (amount, item, date, is_recurring, recurring_date) VALUES (?, ?, ?, ?, ?)',
-          [expense.amount, expense.item, today.toISOString().split('T')[0], 1, currentMonth]
+          [expense.amount, expense.item, today.toISOString().split('T')[0], 1, expense.recurring_date]
         );
       }
     }
@@ -459,6 +490,37 @@ export const resetDatabase = async () => {
     Alert.alert("Error", "Something went wrong while resetting the database.");
     console.error(error);
   }
+};
+
+export const clearIncomeTable = async (): Promise<boolean> => {
+  return await safeDatabaseOperation(async (db) => {
+    await db.runAsync('DELETE FROM income;');
+    return true;
+  }) || false;
+};
+
+export const clearExpensesTable = async (): Promise<boolean> => {
+  return await safeDatabaseOperation(async (db) => {
+    await db.runAsync('DELETE FROM expenses;');
+    return true;
+  }) || false;
+};
+
+export const clearPlannedPurchasesTable = async (): Promise<boolean> => {
+  return await safeDatabaseOperation(async (db) => {
+    await db.runAsync('DELETE FROM planned_purchases;');
+    return true;
+  }) || false;
+};
+
+export const clearAllData = async (): Promise<boolean> => {
+  return await safeDatabaseOperation(async (db) => {
+    await db.runAsync('DELETE FROM income;');
+    await db.runAsync('DELETE FROM expenses;');
+    await db.runAsync('DELETE FROM planned_purchases;');
+    await db.runAsync('DELETE FROM savings;');
+    return true;
+  }) || false;
 };
 
 // Initialize database when the module is imported

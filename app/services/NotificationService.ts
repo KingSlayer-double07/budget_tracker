@@ -47,6 +47,7 @@ export class NotificationService {
   }
 
   private async setupNotificationCategories(): Promise<void> {
+    // Set up notification categories for iOS
     if (Platform.OS === 'ios') {
       await Notifications.setNotificationCategoryAsync('RECURRING_TRANSACTION', [
         {
@@ -59,28 +60,71 @@ export class NotificationService {
         },
       ]);
     }
+
+    // Set up notification channels for Android
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('recurring-transactions', {
+        name: 'Recurring Transactions',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        showBadge: true,
+        enableVibrate: true,
+        enableLights: true,
+      });
+    }
   }
 
   // Schedule a recurring transaction notification
   public async scheduleRecurringTransaction(
     title: string,
     body: string,
-    date: Date,
+    recurringDate: Date,
     identifier: string
   ): Promise<void> {
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title,
-        body,
-        data: { type: 'RECURRING_TRANSACTION', identifier },
-      },
-      trigger: {
-        date,
-        repeats: true,
-        channelId: 'recurring-transactions',
-      },
-      identifier,
-    });
+    try {
+      // Cancel any existing notification with this identifier
+      await this.cancelNotification(identifier);
+
+      // Get the day of the month from the recurring date
+      const dayOfMonth = recurringDate.getDate();
+
+      // Create a new date for the next occurrence
+      const nextDate = new Date();
+      nextDate.setDate(dayOfMonth);
+      nextDate.setHours(9, 0, 0, 0); // Set to 9:00 AM
+      
+      // If the day has already passed this month, schedule for next month
+      if (nextDate < new Date()) {
+        nextDate.setMonth(nextDate.getMonth() + 1);
+      }
+
+      // Schedule the notification
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title,
+          body,
+          sound: true,
+          data: { 
+            type: 'RECURRING_TRANSACTION',
+            identifier,
+            actions: ['MARK_AS_PAID', 'POSTPONE']
+          },
+        },
+        trigger: {
+          date: nextDate,
+          repeats: true,
+          channelId: 'recurring-transactions',
+        },
+        identifier,
+      });
+
+      console.log(`Scheduled recurring notification for ${nextDate.toISOString()}`);
+    } catch (error) {
+      console.error('Error scheduling recurring notification:', error);
+      throw error;
+    }
   }
 
   // Schedule a budget limit alert
@@ -102,9 +146,6 @@ export class NotificationService {
         });
       }
     };
-
-    // Check budget every hour
-    setInterval(checkBudget, 60 * 60 * 1000);
     // Initial check
     checkBudget();
   }

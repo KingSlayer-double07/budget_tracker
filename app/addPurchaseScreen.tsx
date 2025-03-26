@@ -35,7 +35,7 @@ export default function AddPurchaseScreen() {
           
           await notificationService.schedulePurchaseReminder(
             'Planned Purchase Due',
-            `Your planned purchase of ${item} for NGN${numericAmount.toLocaleString()} is due tomorrow`,
+            `Your planned purchase of ${item} for NGN${numericAmount.toLocaleString()} is due on ${notificationDate.toLocaleDateString()}`,
             notificationDate,
             `planned-purchase-${item}-${dueDate}`
           );

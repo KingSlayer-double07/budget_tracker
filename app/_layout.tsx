@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet, View, ActivityIndicator } from 'react-native';
 import { NotificationService } from './services/NotificationService';
 import { AuthenticationService } from './services/AuthenticationService';
+import ExpoInsights from 'expo-insights';
 
 export default function RootLayout() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);

@@ -3,6 +3,7 @@ import { View, Text, TextInput, StyleSheet, Switch, FlatList, TouchableOpacity, 
 import { useRouter } from 'expo-router';
 import { useBudget } from './context/BudgetContext';
 import { NotificationService } from './services/NotificationService';
+import { clearIncomeTable } from './database';
 
 export default function AddIncomeScreen() {
   const [amount, setAmount] = useState('');
@@ -34,22 +35,31 @@ export default function AddIncomeScreen() {
       const success = await addNewIncome(source, numAmount, true, recurringDate);
       if (success) {
         // Schedule notification for recurring income if date is provided
-        if (recurringDate) {
+        if (isRecurring && recurringDate) {
           const notificationService = NotificationService.getInstance();
-          const [year, month] = recurringDate.split('-');
-          const notificationDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+          const day = parseInt(recurringDate);
+          
+          // Create a date for the next occurrence
+          const nextDate = new Date();
+          nextDate.setDate(day);
+          nextDate.setHours(7, 0, 0, 0); // Set to 7:00 AM
+          
+          // If the day has already passed this month, schedule for next month
+          if (nextDate < new Date()) {
+            nextDate.setMonth(nextDate.getMonth() + 1);
+          }
           
           await notificationService.scheduleRecurringTransaction(
             'Recurring Income Due',
-            `Your recurring income of NGN${numAmount.toLocaleString()} from ${source} is due`,
-            notificationDate,
+            `Your recurring income of NGN${numAmount.toLocaleString()} from ${source} is due next on ${nextDate.toLocaleDateString()}`,
+            nextDate,
             `recurring-income-${source}-${recurringDate}`
           );
         }
 
         Alert.alert('Success', 'Income added successfully!');
         setSource('');
-    setAmount('');
+        setAmount('');
         setRecurringDate('');
       } else {
         Alert.alert('Error', 'Failed to add income. Please try again.');
@@ -57,6 +67,37 @@ export default function AddIncomeScreen() {
     } catch (error) {
       Alert.alert('Error', 'An unexpected error occurred. Please try again.');
     }
+  };
+
+  const handleClearIncome = async () => {
+    Alert.alert(
+      'Clear Income Data',
+      'Are you sure you want to clear all income data? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Clear Income',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const success = await clearIncomeTable();
+              if (success) {
+                await refreshData();
+                Alert.alert('Success', 'All income data has been cleared');
+              } else {
+                Alert.alert('Error', 'Failed to clear income data');
+              }
+            } catch (error) {
+              console.error('Error clearing income data:', error);
+              Alert.alert('Error', 'Failed to clear income data');
+            }
+          },
+        },
+      ]
+    );
   };
 
   if (isLoading) {
@@ -105,42 +146,60 @@ export default function AddIncomeScreen() {
         />
       </View>
 
-      <View style={styles.inputContainer}>
-        <Text style={styles.label}>Recurring Date (YYYY-MM)</Text>
-        <TextInput
-          style={styles.input}
-          value={recurringDate}
-          onChangeText={setRecurringDate}
-          placeholder="e.g., 2024-03"
-          placeholderTextColor="#666"
-        />
-            </View>
+      <View style={styles.recurring}>
+        <Text style={styles.recurringText}>Recurring Monthly</Text>
+        <Switch value={isRecurring} onValueChange={setIsRecurring} />
+      </View>
+
+      {isRecurring && (
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Recurring Date (Day of Month)</Text>
+          <TextInput
+            style={styles.input}
+            value={recurringDate}
+            onChangeText={setRecurringDate}
+            placeholder="e.g., 15"
+            keyboardType="numeric"
+            placeholderTextColor="#666"
+          />
+          <Text style={styles.hint}>Enter a day between 1 and 31</Text>
+        </View>
+      )}
 
       <TouchableOpacity style={styles.addButton} onPress={handleSubmit}>
         <Text style={styles.addButtonText}>Add Income</Text>
       </TouchableOpacity>
 
-      <Text style={styles.listHeading}>Income History</Text>
+      <View style={styles.listHeader}>
+        <Text style={styles.listHeading}>Income History</Text>
+        <TouchableOpacity 
+          style={[styles.clearButton, incomeList.length === 0 && styles.clearButtonDisabled]} 
+          onPress={handleClearIncome}
+          disabled={incomeList.length === 0}
+        >
+          <Text style={styles.clearButtonText}>Clear All</Text>
+        </TouchableOpacity>
+      </View>
       
       {incomeList.length === 0 ? (
         <Text style={styles.emptyText}>No income recorded yet.</Text>
       ) : (
-            <FlatList
+        <FlatList
           data={incomeList}
-             keyExtractor={(item) => item.id.toString()}
-             renderItem={({ item }) => (
-              <View style={styles.incomeBox}>
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item }) => (
+            <View style={styles.incomeBox}>
               <View style={styles.incomeContent}>
                 <Text style={styles.incomeSource}>{item.source}</Text>
                 <Text style={styles.incomeAmount}>NGN{item.amount.toLocaleString()}</Text>
               </View>
               <Text style={styles.timestamp}>{item.date}</Text>
-              </View>
-             )}
-             showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listContainer}
-            />
+            </View>
           )}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContainer}
+        />
+      )}
     </View>
   );
 }
@@ -202,6 +261,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
   },
+  recurring: { 
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'white',
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  recurringText: {
+    fontSize: 16,
+    color: '#333',
+  },
   addButton: {
     backgroundColor: '#28a745',
     padding: 15,
@@ -260,5 +337,30 @@ const styles = StyleSheet.create({
     color: '#757575',
     fontSize: 16,
     marginTop: 20,
+  },
+  hint: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  listHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  clearButton: {
+    backgroundColor: '#dc3545',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 5,
+  },
+  clearButtonDisabled: {
+    backgroundColor: '#dc354580',
+  },
+  clearButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });

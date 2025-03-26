@@ -1,24 +1,15 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, TextInput, Button, Switch, Alert, FlatList, StyleSheet, TouchableOpacity } from "react-native";
-import { useRouter } from "expo-router";
-import { addExpense, getExpenses } from "./database";
+import React, { useState } from 'react';
+import { View, Text, TextInput, StyleSheet, Switch, FlatList, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useBudget } from './context/BudgetContext';
 
 export default function AddExpenseScreen() {
-  const [name, setName] = useState("");
-  const [amount, setAmount] = useState("");
-  const [expenses, setExpenses] = useState([]);
-  const [isRecurring, setIsRecurring] = useState(false); // Default to not recurring
+  const [name, setName] = useState('');
+  const [amount, setAmount] = useState('');
+  const [isRecurring, setIsRecurring] = useState(false);
   const router = useRouter();
+  const { expenseList, isLoading, error, addNewExpense, refreshData } = useBudget();
 
-  const fetchData = async () => {
-    const data = await getExpenses();
-    setExpenses(data);
-  };
-    
-  useEffect(() => {
-    fetchData();
-  }, []);
-  
   // Function to get the first day of the next month
   const getNextMonthDate = () => {
     const today = new Date();
@@ -31,133 +22,232 @@ export default function AddExpenseScreen() {
       return;
     }
 
-    const nextDueDate = getNextMonthDate();
-
     const numericAmount = parseFloat(amount);
     if (isNaN(numericAmount) || numericAmount <= 0) {
       Alert.alert("Error", "Please enter a valid amount.");
       return;
     }
 
-    await addExpense(name, numericAmount, isRecurring, nextDueDate);
-    Alert.alert("Success", "Expense added successfully!");
-    setAmount('');
-    setName('');
-    router.back();
-    fetchData();
+    const nextDueDate = getNextMonthDate();
+    const success = await addNewExpense(name.trim(), numericAmount, isRecurring, nextDueDate);
+    
+    if (success) {
+      setName('');
+      setAmount('');
+      setIsRecurring(false);
+      Alert.alert("Success", "Expense added successfully!");
+    } else {
+      Alert.alert("Error", "Failed to add expense. Please try again.");
+    }
   };
 
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007bff" />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={refreshData}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       <Text style={styles.heading}>Add Expense</Text>
 
       <TextInput
-        placeholder="Expense Name"
+        style={styles.input}
+        placeholder="Expense Name (e.g., Rent, Utilities)"
         value={name}
         onChangeText={setName}
-        style={styles.input}
+        autoCapitalize="words"
       />
 
       <TextInput
+        style={styles.input}
         placeholder="Amount"
         value={amount}
         onChangeText={setAmount}
         keyboardType="numeric"
-        style={styles.input}
       />
 
       <View style={styles.recurring}>
-        <Text>Recurring Monthly</Text>
+        <Text style={styles.recurringText}>Recurring Monthly</Text>
         <Switch value={isRecurring} onValueChange={setIsRecurring} />
       </View>
 
-      <Button title="Save Expense" onPress={handleSaveExpense} />
-
-      {expenses.length === 0 ? (
-        <Text>No Expense yet.</Text>
-      ) : (
-            <FlatList
-              data={expenses}
-              keyExtractor={(item) => item.id.toString()}
-              renderItem={({ item }) => (
-                <View style={styles.expenseBox}>
-                  <Text style={styles.expense}>
-                    Expense:{item.item} - NGN{item.amount}
-                  </Text>
-                  <Text style={styles.timestamp}>Date:{item.date}</Text>
-                </View>
-              )}
-            />
-          )}
-      <TouchableOpacity style={styles.refreshButton} onPress={() => fetchData()}>
-        <Text>Refresh Page</Text>
+      <TouchableOpacity style={styles.addButton} onPress={handleSaveExpense}>
+        <Text style={styles.addButtonText}>Add Expense</Text>
       </TouchableOpacity>
-      <Text style={styles.watermark}>Made by Slayer</Text>
+
+      <Text style={styles.listHeading}>Expense History</Text>
+      
+      {expenseList.length === 0 ? (
+        <Text style={styles.emptyText}>No expenses recorded yet.</Text>
+      ) : (
+        <FlatList
+          data={expenseList}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item }) => (
+            <View style={styles.expenseBox}>
+              <View style={styles.expenseContent}>
+                <Text style={styles.expenseName}>{item.item}</Text>
+                <Text style={styles.expenseAmount}>NGN{item.amount.toLocaleString()}</Text>
+              </View>
+              <Text style={styles.timestamp}>{item.date}</Text>
+            </View>
+          )}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContainer}
+        />
+      )}
     </View>
   );
-
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    justifyContent: 'flex-start',
     backgroundColor: '#f4f4f4',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f4f4f4',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f4f4f4',
+    padding: 20,
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#007bff',
+    padding: 10,
+    borderRadius: 5,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   heading: {
     fontSize: 22,
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 20,
+    color: '#333',
   },
   input: {
     backgroundColor: 'white',
     padding: 15,
     borderRadius: 8,
     marginBottom: 10,
+    fontSize: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  recurring: { 
-    flexDirection: "row", 
-    alignItems: "center", 
-    marginBottom: 20 
+  recurring: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'white',
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  expenseBox: { 
-    flexDirection: "row", 
-    justifyContent: "space-between", 
-    backgroundColor: "#fff", 
-    padding: 10, 
-    marginTop: 10, 
-    borderRadius: 10,
-    flexWrap: "wrap"
+  recurringText: {
+    fontSize: 16,
+    color: '#333',
   },
-  refreshButton: { 
-    justifyContent: "center", 
-    backgroundColor: "#fff", 
-    padding: 10, 
-    marginTop: 10, 
-    borderRadius: 10,
+  addButton: {
+    backgroundColor: '#007bff',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  expense: { 
-    fontSize: 16, 
-    color: "#333" 
+  addButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
-  delete: { 
-    fontSize: 18, 
-    color: "#e91e63" 
+  listHeading: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333',
   },
-  timestamp: { 
-    fontSize: 12, 
-    color: "#757575", 
-    marginTop: 15,
-    fontStyle: "italic" 
+  listContainer: {
+    paddingBottom: 20,
   },
-  watermark: {
-    position: 'static',
-    bottom: 10,
-    right: 10,
+  expenseBox: {
+    backgroundColor: 'white',
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  expenseContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  expenseName: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '600',
+  },
+  expenseAmount: {
+    fontSize: 16,
+    color: '#dc3545',
+    fontWeight: 'bold',
+  },
+  timestamp: {
     fontSize: 12,
-    color: 'rgba(0, 0, 0, 0.3)', // Faded text
-  }
+    color: '#757575',
+    fontStyle: 'italic',
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: '#757575',
+    fontSize: 16,
+    marginTop: 20,
+  },
 });

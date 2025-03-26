@@ -1,273 +1,440 @@
 import * as SQLite from 'expo-sqlite';
 import * as FileSystem from 'expo-file-system';
 import { Alert } from 'react-native';
+import { router } from 'expo-router';
 
-// Open the database asynchronously
+// Database types
+interface Income {
+  id: number;
+  source: string;
+  amount: number;
+  date: string;
+  is_recurring: number;
+  recurring_date: string | null;
+}
+
+interface Expense {
+  id: number;
+  item: string;
+  amount: number;
+  date: string;
+  is_recurring: number;
+  recurring_date: string | null;
+}
+
+interface PlannedPurchase {
+  id: number;
+  item: string;
+  amount: number;
+  purchased: number;
+}
+
+interface Savings {
+  id: number;
+  amount: number;
+  frequency: string;
+  date: string;
+}
+
+interface DatabaseResult {
+  total?: number;
+}
+
+// Validation types
+interface ValidationResult {
+  isValid: boolean;
+  error?: string;
+}
+
+// Validation functions
+const validateAmount = (amount: number): ValidationResult => {
+  if (isNaN(amount)) {
+    return { isValid: false, error: "Amount must be a valid number" };
+  }
+  if (amount < 0) {
+    return { isValid: false, error: "Amount cannot be negative" };
+  }
+  if (amount > Number.MAX_SAFE_INTEGER) {
+    return { isValid: false, error: "Amount is too large" };
+  }
+  return { isValid: true };
+};
+
+const validateString = (value: string, fieldName: string, maxLength: number = 100): ValidationResult => {
+  if (!value || value.trim().length === 0) {
+    return { isValid: false, error: `${fieldName} cannot be empty` };
+  }
+  if (value.length > maxLength) {
+    return { isValid: false, error: `${fieldName} is too long (max ${maxLength} characters)` };
+  }
+  return { isValid: true };
+};
+
+const validateDate = (date: string): ValidationResult => {
+  const dateObj = new Date(date);
+  if (isNaN(dateObj.getTime())) {
+    return { isValid: false, error: "Invalid date format" };
+  }
+  if (dateObj > new Date()) {
+    return { isValid: false, error: "Date cannot be in the future" };
+  }
+  return { isValid: true };
+};
+
+const validateRecurringDate = (date: string): ValidationResult => {
+  const dateObj = new Date(date);
+  if (isNaN(dateObj.getTime())) {
+    return { isValid: false, error: "Invalid recurring date format" };
+  }
+  // Ensure the date is in YYYY-MM format
+  const dateRegex = /^\d{4}-\d{2}$/;
+  if (!dateRegex.test(date)) {
+    return { isValid: false, error: "Recurring date must be in YYYY-MM format" };
+  }
+  return { isValid: true };
+};
+
+// Database configuration
+const DB_NAME = 'budgetTracker.db';
+
+// Database connection management
 let db: SQLite.SQLiteDatabase | null = null;
+let isInitialized = false;
 
-const setupDatabase = async () => {
+export const initializeDatabase = async (): Promise<boolean> => {
+  if (isInitialized) {
+    return true;
+  }
+
   try {
-    db = await SQLite.openDatabaseAsync('budgetTracker.db');
-    await db.execAsync(`PRAGMA foreign_keys = ON;`); // Ensure foreign keys work (optional)
-
+    db = await SQLite.openDatabaseAsync(DB_NAME);
+    await db.execAsync(`PRAGMA foreign_keys = ON;`);
+    
     // Create tables
-    await db.execAsync(
-      `CREATE TABLE IF NOT EXISTS income (
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS income (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         source TEXT NOT NULL,
         amount REAL NOT NULL,
         date TEXT NOT NULL,
         is_recurring INTEGER DEFAULT 0,
         recurring_date TEXT
-      );`
-    );
+      );
 
-    await db.execAsync(
-      `CREATE TABLE IF NOT EXISTS expenses (
+      CREATE TABLE IF NOT EXISTS expenses (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         item TEXT NOT NULL,
         amount REAL NOT NULL,
         date TEXT NOT NULL,
         is_recurring INTEGER DEFAULT 0,
         recurring_date TEXT
-      );`
-    );
+      );
 
-    await db.execAsync(
-      `CREATE TABLE IF NOT EXISTS planned_purchases (
+      CREATE TABLE IF NOT EXISTS planned_purchases (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         item TEXT NOT NULL,
         amount REAL NOT NULL,
         purchased INTEGER DEFAULT 0
-      );`
-    );
+      );
 
-    await db.execAsync(
-      `CREATE TABLE IF NOT EXISTS savings (
+      CREATE TABLE IF NOT EXISTS savings (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         amount REAL NOT NULL,
         frequency TEXT NOT NULL,
         date TEXT NOT NULL
-      );`
-    );
+      );
+    `);
 
-    console.log("Database setup complete ✅");
+    isInitialized = true;
+    console.log("Database initialized successfully ✅");
+    return true;
   } catch (error) {
-    console.error("Error setting up database:", error);
+    console.error("Failed to initialize database:", error);
+    Alert.alert(
+      "Database Error",
+      "Failed to initialize the database. Please restart the app."
+    );
+    return false;
   }
 };
 
-export const addPlannedPurchase = async (item: string, amount: number) => {
-    try {
-      if (!db) return;
-  
-      await db.runAsync(
-        `INSERT INTO planned_purchases (item, amount, purchased) VALUES (?, ?, 0);`,
-        [item, amount]
-      );
-  
-      console.log(`Planned purchase added: ${item} - ${amount}`);
-    } catch (error) {
-      console.error("Error adding planned purchase:", error);
-    }
+export const getDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
+  if (!isInitialized) {
+    await initializeDatabase();
+  }
+  if (!db) {
+    throw new Error("Database connection not available");
+  }
+  return db;
+};
+
+const safeDatabaseOperation = async <T extends unknown>(
+  operation: (db: SQLite.SQLiteDatabase) => Promise<T>
+): Promise<T | null> => {
+  try {
+    const database = await getDatabase();
+    return await operation(database);
+  } catch (error) {
+    console.error("Database operation failed:", error);
+    Alert.alert("Error", "An unexpected error occurred. Please try again.");
+    return null;
+  }
+};
+
+// Database operations with validation
+export const addPlannedPurchase = async (item: string, amount: number): Promise<boolean> => {
+  // Validate inputs
+  const itemValidation = validateString(item, "Item name");
+  if (!itemValidation.isValid) {
+    Alert.alert("Validation Error", itemValidation.error);
+    return false;
+  }
+
+  const amountValidation = validateAmount(amount);
+  if (!amountValidation.isValid) {
+    Alert.alert("Validation Error", amountValidation.error);
+    return false;
+  }
+
+  return await safeDatabaseOperation(async (db) => {
+    await db.runAsync(
+      `INSERT INTO planned_purchases (item, amount, purchased) VALUES (?, ?, 0);`,
+      [item.trim(), amount]
+    );
+    console.log(`Planned purchase added: ${item} - ${amount}`);
+    Alert.alert("Success", "Purchase added successfully!");
+    router.push('/plannedPurchasesScreen');
+    return true;
+  }) || false;
 };
 
 export const getPlannedPurchases = async () => {
-    try {
-      if (!db) return [];
-  
-      const results = await db.getAllAsync(`SELECT * FROM planned_purchases ORDER BY purchased ASC, id DESC;`);
-      return results; // Returns an array of purchases
-    } catch (error) {
-      console.error("Error fetching planned purchases:", error);
-      return [];
-    }
+  return await safeDatabaseOperation(async (db) => {
+    const results = await db.getAllAsync(
+      `SELECT * FROM planned_purchases ORDER BY purchased ASC, id DESC;`
+    );
+    return results;
+  }) || [];
 };
 
 export const getIncome = async () => {
-  try {
-    if (!db) return [];
-
+  return await safeDatabaseOperation(async (db) => {
     const results = await db.getAllAsync(`SELECT * FROM income ORDER BY date DESC;`);
-    return results; // Returns an array of purchases
-  } catch (error) {
-    console.error("Error fetching Income:", error);
-    return [];
-  }
+    return results;
+  }) || [];
 };
 
 export const getExpenses = async () => {
-  try {
-    if (!db) return [];
-
+  return await safeDatabaseOperation(async (db) => {
     const results = await db.getAllAsync(`SELECT * FROM expenses ORDER BY date DESC;`);
-    return results; // Returns an array of purchases
-  } catch (error) {
-    console.error("Error fetching Expenses:", error);
-    return [];
-  }
+    return results;
+  }) || [];
 };
 
-export const markPurchaseAsBought = async (id: number, amount: number, item:string) => {
-    try {
-      if (!db) return;
-  
-      // Step 1: Update planned purchase to mark as purchased
-      const result = await db.getFirstAsync(
-        "SELECT * FROM planned_purchases WHERE id = ?",
-        [id]
-      );
-  
-      if (!result) return;
-  
-      const { item, amount, purchased } = result;
-  
-      if (purchased) {
-        Alert.alert("Already Bought", "This item has already been marked as bought.");
-        return;
-      } else {
-        // Mark purchase as bought
-      await db.runAsync(`UPDATE planned_purchases SET purchased = 1 WHERE id = ?;`, [id]);
-      Alert.alert("Success", "Purchase marked as bought!");
-      }
-  
-      
-  
-      // Check if expense already exists to prevent duplicates
-    const existingExpense = await db.getFirstAsync(
-      "SELECT * FROM expenses WHERE item = ?",
-      [item]
+export const markPurchaseAsBought = async (id: number, amount: number, item: string): Promise<boolean> => {
+  return await safeDatabaseOperation(async (db) => {
+    const result = await db.getFirstAsync<PlannedPurchase>(
+      "SELECT * FROM planned_purchases WHERE id = ?",
+      [id]
     );
 
-    if (existingExpense) {
-      Alert.alert("Already Added", "This expense has already been recorded.");
-      return;
+    if (!result) {
+      Alert.alert("Error", "Purchase not found");
+      return false;
     }
 
-    // Step 2: Insert expense into expenses table
-      const currentDate = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
-      await db.runAsync(`INSERT INTO expenses (item, amount, date) VALUES (?, ?, ?);`, [item, amount, currentDate]);
-  
-      console.log(`Purchase marked as bought: ID ${id}, Amount: ${amount}`);
-    } catch (error) {
-      console.error("Error marking purchase as bought:", error);
+    if (result.purchased) {
+      Alert.alert("Already Bought", "This item has already been marked as bought.");
+      return false;
     }
+
+    // Start transaction
+    await db.execAsync('BEGIN TRANSACTION');
+
+    try {
+      // Mark purchase as bought
+      await db.runAsync(
+        `UPDATE planned_purchases SET purchased = 1 WHERE id = ?;`,
+        [id]
+      );
+
+      // Check for existing expense
+      const existingExpense = await db.getFirstAsync(
+        "SELECT * FROM expenses WHERE item = ?",
+        [item]
+      );
+
+      if (existingExpense) {
+        Alert.alert("Already Added", "This expense has already been recorded.");
+        await db.execAsync('ROLLBACK');
+        return false;
+      }
+
+      // Add expense
+      const currentDate = new Date().toISOString().split('T')[0];
+      await db.runAsync(
+        `INSERT INTO expenses (item, amount, date) VALUES (?, ?, ?);`,
+        [item, amount, currentDate]
+      );
+
+      await db.execAsync('COMMIT');
+      Alert.alert("Success", "Purchase marked as bought!");
+      return true;
+    } catch (error) {
+      await db.execAsync('ROLLBACK');
+      throw error;
+    }
+  }) || false;
 };
 
 export const getTotalIncome = async (): Promise<number> => {
-    try {
-      if (!db) return 0;
-      const result = await db.getFirstAsync(`SELECT SUM(amount) as total FROM income;`);
-      return result?.total || 0; // Return 0 if no income exists
-    } catch (error) {
-      console.error("Error fetching total income:", error);
-      return 0;
-    }
-};
-  
-  export const getTotalExpenses = async (): Promise<number> => {
-    try {
-      if (!db) return 0;
-      const result = await db.getFirstAsync(`SELECT SUM(amount) as total FROM expenses;`);
-      return result?.total || 0; // Return 0 if no expenses exist
-    } catch (error) {
-      console.error("Error fetching total expenses:", error);
-      return 0;
-    }
-};
-  
-  export const getBalance = async (): Promise<number> => {
-    const income = await getTotalIncome();
-    const expenses = await getTotalExpenses();
-    return income - expenses;
+  return await safeDatabaseOperation(async (db) => {
+    const result = await db.getFirstAsync<DatabaseResult>(`SELECT SUM(amount) as total FROM income;`);
+    return result?.total || 0;
+  }) || 0;
 };
 
-export const addIncome = async (source: string, amount: number, isRecurring: boolean, recurringDate: string) => {
-    try {
-      if (!db) return;
-      const date = new Date().toISOString().split('T')[0]; // Current date
-      const recurringDates = isRecurring ? recurringDate : null;
-      await db.runAsync(
-        `INSERT INTO income (source, amount, date, is_recurring, recurring_date) VALUES (?, ?, ?, ?, ?);`,
-        [source, amount, date, isRecurring ? 1 : 0, recurringDates]);
-      console.log(`Income added: ${source}, ${amount}`);
-    } catch (error) {
-      console.error("Error adding income:", error);
-    }
+export const getTotalExpenses = async (): Promise<number> => {
+  return await safeDatabaseOperation(async (db) => {
+    const result = await db.getFirstAsync<DatabaseResult>(`SELECT SUM(amount) as total FROM expenses;`);
+    return result?.total || 0;
+  }) || 0;
 };
 
-export const addExpense = async (item: string, amount: number,  isRecurring: boolean, recurringDate: string) => {
-  try {
-    if (!db) return;
+export const getBalance = async (): Promise<number> => {
+  const income = await getTotalIncome();
+  const expenses = await getTotalExpenses();
+  return income - expenses;
+};
+
+export const addIncome = async (
+  source: string,
+  amount: number,
+  isRecurring: boolean,
+  recurringDate: string
+): Promise<boolean> => {
+  // Validate inputs
+  const sourceValidation = validateString(source, "Source");
+  if (!sourceValidation.isValid) {
+    Alert.alert("Validation Error", sourceValidation.error);
+    return false;
+  }
+
+  const amountValidation = validateAmount(amount);
+  if (!amountValidation.isValid) {
+    Alert.alert("Validation Error", amountValidation.error);
+    return false;
+  }
+
+  if (isRecurring) {
+    const recurringDateValidation = validateRecurringDate(recurringDate);
+    if (!recurringDateValidation.isValid) {
+      Alert.alert("Validation Error", recurringDateValidation.error);
+      return false;
+    }
+  }
+
+  return await safeDatabaseOperation(async (db) => {
+    const date = new Date().toISOString().split('T')[0];
+    const recurringDates = isRecurring ? recurringDate : null;
+    
+    await db.runAsync(
+      `INSERT INTO income (source, amount, date, is_recurring, recurring_date) 
+       VALUES (?, ?, ?, ?, ?);`,
+      [source.trim(), amount, date, isRecurring ? 1 : 0, recurringDates]
+    );
+    
+    console.log(`Income added: ${source}, ${amount}`);
+    Alert.alert("Success", "Income added successfully!");
+    router.back();
+    return true;
+  }) || false;
+};
+
+export const addExpense = async (
+  item: string,
+  amount: number,
+  isRecurring: boolean,
+  recurringDate: string
+): Promise<boolean> => {
+  // Validate inputs
+  const itemValidation = validateString(item, "Item name");
+  if (!itemValidation.isValid) {
+    Alert.alert("Validation Error", itemValidation.error);
+    return false;
+  }
+
+  const amountValidation = validateAmount(amount);
+  if (!amountValidation.isValid) {
+    Alert.alert("Validation Error", amountValidation.error);
+    return false;
+  }
+
+  if (isRecurring) {
+    const recurringDateValidation = validateRecurringDate(recurringDate);
+    if (!recurringDateValidation.isValid) {
+      Alert.alert("Validation Error", recurringDateValidation.error);
+      return false;
+    }
+  }
+
+  return await safeDatabaseOperation(async (db) => {
     const date = new Date().toISOString().split('T')[0];
     const recurringDate = isRecurring ? date : null;
+    
     await db.runAsync(
-    'INSERT INTO expenses (item, amount, date, is_recurring, recurring_date) VALUES (?, ?, ?, ?, ?)',
-    [item, amount, date, isRecurring ? 1 : 0, recurringDate]);
+      'INSERT INTO expenses (item, amount, date, is_recurring, recurring_date) VALUES (?, ?, ?, ?, ?)',
+      [item.trim(), amount, date, isRecurring ? 1 : 0, recurringDate]
+    );
+    
     console.log(`Expense added: ${item}, ${amount}`);
-  } catch (error) {
-    console.error("Error adding expense", error);
-  }
-  
+    Alert.alert("Success", "Expense added successfully!");
+    router.back();
+    return true;
+  }) || false;
 };
 
-export const deletePurchase = async (key: number) => {
-  try {
-    Alert.alert(
-      "Delete Purchase",
-      "Are you sure you want to delete this record? This action cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Yes, Delete", onPress: async () => {
-          if (!db) return;
-          await db.runAsync(
-            `DELETE FROM planned_purchases WHERE id = ?;`, 
-            [key]
-          );
-          console.log(`Purchase with ID ${key} deleted successfully`);
-          Alert.alert("Success", "Purchase deleted successfully");
-          } 
-        },
-      ]
+export const deletePurchase = async (key: number): Promise<boolean> => {
+  return await safeDatabaseOperation(async (db) => {
+    await db.runAsync(
+      `DELETE FROM planned_purchases WHERE id = ?;`,
+      [key]
     );
-  } catch (error) {
-    Alert.alert("Error", "Unable to delete data");
-    console.error("Database Error:", error);
-  }
+    console.log(`Purchase with ID ${key} deleted successfully`);
+    return true;
+  }) || false;
 };
-  
+
 export const handleRecurringUpdates = async () => {
   const today = new Date();
-  const currentMonth = today.getFullYear() + '-' + (today.getMonth() + 1); // YYYY-MM
-  
+  const currentMonth = today.getFullYear() + '-' + (today.getMonth() + 1);
 
   // Process recurring income
   try {
     if (!db) return;
-    const recurringIncome = await db.getAllAsync('SELECT * FROM income WHERE is_recurring = 1');
+    const recurringIncome = await db.getAllAsync<Income>('SELECT * FROM income WHERE is_recurring = 1');
     for (const income of recurringIncome) {
       if (!income.recurring_date || !income.recurring_date.startsWith(currentMonth)) {
         await db.runAsync(
-        'INSERT INTO income (amount, source, date, is_recurring, recurring_date) VALUES (?, ?, ?, ?, ?)',
-        [income.amount, income.source, today.toISOString().split('T')[0], 1, currentMonth]
-      );
+          'INSERT INTO income (amount, source, date, is_recurring, recurring_date) VALUES (?, ?, ?, ?, ?)',
+          [income.amount, income.source, today.toISOString().split('T')[0], 1, currentMonth]
+        );
+      }
     }
-  }
-  } catch (error){
-    console.error("Error processing recurring income", error);
-  }
-  
 
-  // Process recurring expenses
+    // Process recurring expenses
     if (!db) return;
-  const recurringExpenses = await db.getAllAsync('SELECT * FROM expenses WHERE is_recurring = 1');
-  for (const expense of recurringExpenses) {
-    if (!expense.recurring_date || !expense.recurring_date.startsWith(currentMonth)) {
-      await db.runAsync(
-        'INSERT INTO expenses (cost, item, date, is_recurring, recurring_date) VALUES (?, ?, ?, ?, ?)',
-        [expense.cost, expense.item, today.toISOString().split('T')[0], 1, currentMonth]
-      );
+    const recurringExpenses = await db.getAllAsync<Expense>('SELECT * FROM expenses WHERE is_recurring = 1');
+    for (const expense of recurringExpenses) {
+      if (!expense.recurring_date || !expense.recurring_date.startsWith(currentMonth)) {
+        await db.runAsync(
+          'INSERT INTO expenses (amount, item, date, is_recurring, recurring_date) VALUES (?, ?, ?, ?, ?)',
+          [expense.amount, expense.item, today.toISOString().split('T')[0], 1, currentMonth]
+        );
+      }
     }
+  } catch (error) {
+    console.error("Error processing recurring updates:", error);
   }
 };
 
@@ -294,7 +461,8 @@ export const resetDatabase = async () => {
   }
 };
 
- 
+// Initialize database when the module is imported
+initializeDatabase().catch(error => {
+  console.error("Failed to initialize database:", error);
+});
 
-// Export functions for database access
-export { setupDatabase, db };

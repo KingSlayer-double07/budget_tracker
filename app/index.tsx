@@ -1,145 +1,66 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Platform, Alert } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter } from "expo-router";
-import { getTotalIncome, getTotalExpenses, getBalance, resetDatabase } from './database';
-import * as Notifications from 'expo-notifications';
-import * as TaskManager from 'expo-task-manager';
-
-// Background Task Name
-const NOTIFICATION_TASK = "DAILY_NOTIFICATION_TASK";
-
-// Register Background Task
-TaskManager.defineTask(NOTIFICATION_TASK, async () => {
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: "Daily Balance Reminder",
-      body: "Check your current balance in the app!",
-      sound: true,
-    },
-    trigger: { hour: 9, minute: 0, repeats: true },
-  });
-});
-
-// Request Permissions & Schedule Notification
-const scheduleDailyNotification = async () => {
-  const { status } = await Notifications.requestPermissionsAsync();
-  if (status !== "granted") {
-    Alert.alert("Permission required", "Please enable notifications in settings.");
-    return;
-  }
-
-  // Cancel existing notifications to avoid duplicates
-  await Notifications.cancelAllScheduledNotificationsAsync();
-
-  // Ensure the task is registered
-  await Notifications.registerTaskAsync(NOTIFICATION_TASK);
-
-  Alert.alert("Scheduled", "Daily notification set for 9 AM!");
-  console.log("Notification Scheduled");
-};
+import { useBudget } from './context/BudgetContext';
 
 export default function Index() {
-  const [income, setIncome] = useState("");
-  const [expenses, setExpenses] = useState("");
-  const [balance, setBalance] = useState("");
-  const [balanceCheck, setBalanceCheck] = useState(0);
   const router = useRouter();
-  const [refreshing, setRefreshing] = useState(false);
-  
-  
+  const {
+    totalIncome,
+    totalExpenses,
+    balance,
+    isLoading,
+    error,
+    refreshData
+  } = useBudget();
 
-  const fetchData = async () => {
-    const totalIncome = await getTotalIncome();
-    const totalExpenses = await getTotalExpenses();
-    const balanceAmount = await getBalance();
-    
-    setIncome(parseFloat(totalIncome.toFixed(2)).toLocaleString());
-    setExpenses(parseFloat(totalExpenses.toFixed(2)).toLocaleString());
-    setBalance(parseFloat(balanceAmount.toFixed(2)).toLocaleString());
-    setBalanceCheck(balanceAmount);
-  };
+  const [refreshing, setRefreshing] = React.useState(false);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  useEffect(() => {
-    const requestPermissions = async () => {
-      const { status } = await Notifications.requestPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert("Permission required", "Please enable notifications in settings.");
-      }
-      if (status === "granted") console.log("Permission granted");
-    };
-    requestPermissions();
-  }, []);
-
-  const sendTestNotification = async () => {
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: "Test Notification",
-        body: "This is a test notification from your app!",
-        sound: true,
-      },
-      trigger: null, // Send immediately
-    });
-    console.log("Notification Sent");
-    scheduleDailyNotification();
-  };
-
-  const dailyNotification = async () => {
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: "Current Balance",
-        body: ""
-      }
-    })
-  }
-  
-  //pul-to-refresh function
-  const onRefresh = useCallback(async () => {
+  const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    await fetchData();
+    await refreshData();
     setRefreshing(false);
-  }, []);
+  }, [refreshData]);
 
-  // Pie Chart Data
-  const pieData = [
-    {
-      key: 1,
-      value: parseFloat(expenses),
-      svg: { fill: '#FF6B6B' }, // Red for expenses
-      label: 'Expenses',
-    },
-    {
-      key: 2,
-      value: parseFloat(income),
-      svg: { fill: '#4CAF50' }, // Green for income
-      label: 'Income',
-    },
-  ].filter((item) => item.value > 0); // Ensure no zero values in the pie chart
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007bff" />
+      </View>
+    );
+  }
 
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={refreshData}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <ScrollView 
-    style={styles.container}
+      style={styles.container}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
       <Text style={styles.heading}>Your Dashboard</Text>
       
       <View style={styles.card}>
         <Text style={styles.label}>💰 Total Income:</Text>
-        <Text style={styles.value}>NGN{income}</Text>
+        <Text style={styles.value}>NGN{totalIncome.toLocaleString()}</Text>
       </View>
 
       <View style={styles.card}>
         <Text style={styles.label}>🛒 Total Expenses:</Text>
-        <Text style={styles.value}>NGN{expenses}</Text>
+        <Text style={styles.value}>NGN{totalExpenses.toLocaleString()}</Text>
       </View>
 
       <View style={styles.card}>
-        <Text style={[styles.value, balanceCheck >= 0 ? styles.positive : styles.negative]}>
-          📊 Balance: NGN{balance}
+        <Text style={[styles.value, balance >= 0 ? styles.positive : styles.negative]}>
+          📊 Balance: NGN{balance.toLocaleString()}
         </Text>
       </View>
 
@@ -153,13 +74,7 @@ export default function Index() {
         <TouchableOpacity style={styles.button} onPress={() => router.push('/addPurchaseScreen')}>
           <Text style={styles.buttonText}>Manage Purchases</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.deleteButton} onPress={resetDatabase}>
-          <Text style={styles.buttonText}>Delete Database</Text>
-        </TouchableOpacity>
       </View>
-      <TouchableOpacity style={styles.watermark} onPress={sendTestNotification}>
-        <Text>Made by Slayer</Text>
-      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -169,6 +84,35 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     backgroundColor: '#f4f4f4',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f4f4f4',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f4f4f4',
+    padding: 20,
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#007bff',
+    padding: 10,
+    borderRadius: 5,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   heading: {
     fontSize: 22,
@@ -209,15 +153,7 @@ const styles = StyleSheet.create({
   },
   button: {
     flexBasis: '45%',
-    backgroundColor: '#007bff',
-    padding: 5,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginBottom: 5,
-  },
-  deleteButton: {
-    flexBasis: '45%',
-    backgroundColor: '#dc3545',
+    backgroundColor: '#043927',
     padding: 5,
     borderRadius: 10,
     alignItems: 'center',
@@ -227,21 +163,5 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
-  },
-  chartContainer: {
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  chartTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  watermark: {
-    position: 'static',
-    bottom: 10,
-    right: 10,
-    fontSize: 12,
-    color: 'rgba(0, 0, 0, 0.3)', // Faded text
   }
 });

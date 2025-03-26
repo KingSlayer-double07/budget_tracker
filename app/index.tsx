@@ -57,7 +57,15 @@ export default function Index() {
       style={styles.container}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
-      <Text style={styles.heading}>Your Dashboard</Text>
+      <View style={styles.header}>
+        <Text style={styles.heading}>Your Dashboard</Text>
+        <TouchableOpacity 
+          style={styles.settingsButton}
+          onPress={() => router.push('/settingsScreen')}
+        >
+          <Text style={styles.settingsButtonText}>⚙️</Text>
+        </TouchableOpacity>
+      </View>
       
       <View style={styles.card}>
         <Text style={styles.label}>💰 Total Income:</Text>
@@ -99,6 +107,12 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#f4f4f4',
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -131,8 +145,12 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 22,
     fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 20,
+  },
+  settingsButton: {
+    padding: 10,
+  },
+  settingsButtonText: {
+    fontSize: 24,
   },
   card: {
     padding: 20,

@@ -73,6 +73,17 @@ export class NotificationService {
         enableVibrate: true,
         enableLights: true,
       });
+
+      await Notifications.setNotificationChannelAsync('purchase-reminders', {
+        name: 'Purchase Reminders',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        showBadge: true,
+        enableVibrate: true,
+        enableLights: true,
+      });
     }
   }
 
@@ -81,11 +92,27 @@ export class NotificationService {
     title: string,
     body: string,
     recurringDate: Date,
-    identifier: string
+    identifier: string,
+    description: string
   ): Promise<void> {
     try {
       // Cancel any existing notification with this identifier
       await this.cancelNotification(identifier);
+
+      // Send immediate notification
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Recurring Transaction Added',
+          body,
+          sound: true,
+          data: { 
+            type: 'RECURRING_TRANSACTION_ADDED',
+            identifier,
+          },
+        },
+        trigger: null,
+        identifier: `${identifier}-added`,
+      });
 
       // Get the day of the month from the recurring date
       const dayOfMonth = recurringDate.getDate();
@@ -100,29 +127,51 @@ export class NotificationService {
         nextDate.setMonth(nextDate.getMonth() + 1);
       }
 
-      // Schedule the notification
+      // Schedule the recurring notification
       await Notifications.scheduleNotificationAsync({
         content: {
           title,
-          body,
+          body: `Your recurring transaction "${description}" is due today`,
           sound: true,
           data: { 
             type: 'RECURRING_TRANSACTION',
             identifier,
-            actions: ['MARK_AS_PAID', 'POSTPONE']
+            actions: ['MARK_AS_PAID', 'POSTPONE', 'CANCEL_FUTURE']
           },
         },
         trigger: {
           date: nextDate,
           repeats: true,
-          channelId: 'recurring-transactions',
+          channelId: 'recurring-transactions'
         },
-        identifier,
+        identifier: `${identifier}-recurring`,
       });
 
-      console.log(`Scheduled recurring notification for ${nextDate.toISOString()}`);
     } catch (error) {
-      console.error('Error scheduling recurring notification:', error);
+      console.error('Error in scheduleRecurringTransaction:', error);
+      throw error;
+    }
+  }
+
+  // Cancel future occurrences of a recurring transaction
+  public async cancelFutureOccurrences(identifier: string): Promise<void> {
+    try {
+      // Cancel the recurring notification
+      await this.cancelNotification(`${identifier}-recurring`);
+      
+      // Send a confirmation notification
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Recurring Transaction Cancelled',
+          body: 'Future occurrences of this recurring transaction have been cancelled.',
+          sound: true,
+          data: { type: 'RECURRING_TRANSACTION_CANCELLED', identifier },
+        },
+        trigger: null,
+        identifier: `${identifier}-cancelled`,
+      });
+    } catch (error) {
+      console.error('Error cancelling future occurrences:', error);
       throw error;
     }
   }
@@ -140,13 +189,14 @@ export class NotificationService {
           content: {
             title,
             body,
+            sound: true,
             data: { type: 'BUDGET_ALERT' },
           },
           trigger: null,
+          identifier: `budget-alert-${Date.now()}`,
         });
       }
     };
-    // Initial check
     checkBudget();
   }
 
@@ -157,22 +207,38 @@ export class NotificationService {
     dueDate: Date,
     identifier: string
   ): Promise<void> {
+    // Send immediate notification
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Purchase Added',
+        body: `Your planned purchase "${title}" has been added to your list. Due date: ${dueDate.toLocaleDateString()}`,
+        sound: true,
+        data: { type: 'PURCHASE_ADDED', identifier },
+      },
+      trigger: null,
+      identifier: `${identifier}-added`,
+    });
+
     // Schedule reminder for 1 day before
     const reminderDate = new Date(dueDate);
     reminderDate.setDate(reminderDate.getDate() - 1);
 
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title,
-        body,
-        data: { type: 'PURCHASE_REMINDER', identifier },
-      },
-      trigger: {
-        date: reminderDate,
-        channelId: 'purchase-reminders',
-      },
-      identifier: `${identifier}-reminder`,
-    });
+    // Ensure the reminder date is in the future
+    if (reminderDate > new Date()) {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Upcoming Purchase',
+          body: `Your planned purchase "${title}" is due tomorrow`,
+          sound: true,
+          data: { type: 'PURCHASE_REMINDER', identifier },
+        },
+        trigger: {
+          date: reminderDate,
+          channelId: 'purchase-reminders'
+        },
+        identifier: `${identifier}-reminder`,
+      });
+    }
   }
 
   // Cancel a specific notification
@@ -209,32 +275,5 @@ export class NotificationService {
     subscription: Notifications.Subscription
   ): void {
     subscription.remove();
-  }
-
-  // Add a test function to verify notifications
-  public async testNotification(): Promise<void> {
-    try {
-      // Schedule a test notification that will trigger in 5 seconds
-      const testDate = new Date();
-      testDate.setSeconds(testDate.getSeconds() + 5);
-      
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: "Slayer Rules!!!",
-          body: "This is a notification to remind you that you are the KingSlayer!",
-          data: { type: 'TEST' },
-        },
-        trigger: {
-          date: testDate,
-          channelId: 'test-channel',
-          //type: 'date'
-        },
-        identifier: 'test-notification',
-      });
-      console.log('Test notification scheduled successfully');
-    } catch (error) {
-      console.error('Error scheduling test notification:', error);
-      throw error;
-    }
   }
 } 

@@ -394,11 +394,11 @@ export const addExpense = async (
 
   return await safeDatabaseOperation(async (db) => {
     const date = new Date().toISOString().split('T')[0];
-    const recurringDate = isRecurring ? date : null;
+    const recurringDates = isRecurring ? recurringDate : null;
     
     await db.runAsync(
       'INSERT INTO expenses (item, amount, date, is_recurring, recurring_date) VALUES (?, ?, ?, ?, ?)',
-      [item.trim(), amount, date, isRecurring ? 1 : 0, recurringDate]
+      [item.trim(), amount, date, isRecurring ? 1 : 0, recurringDates]
     );
     
     // Check budget threshold immediately after adding expense

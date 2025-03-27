@@ -38,8 +38,20 @@ export default function RootLayout() {
       );
 
       const responseListener = notificationService.addNotificationResponseListener(
-        (response) => {
+        async (response) => {
           console.log('Notification response:', response);
+          
+          const { actionIdentifier, notification } = response;
+          const { data } = notification.request.content;
+
+          if (actionIdentifier === 'CANCEL_FUTURE' && data?.identifier) {
+            try {
+              await notificationService.cancelFutureOccurrences(data.identifier);
+              console.log('Future occurrences cancelled for:', data.identifier);
+            } catch (error) {
+              console.error('Error cancelling future occurrences:', error);
+            }
+          }
         }
       );
 

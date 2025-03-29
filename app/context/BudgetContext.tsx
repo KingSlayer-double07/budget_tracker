@@ -26,7 +26,7 @@ interface BudgetContextType {
   refreshData: () => Promise<void>;
   addNewIncome: (source: string, amount: number, isRecurring: boolean, recurringDate: string) => Promise<boolean>;
   addNewExpense: (item: string, amount: number, isRecurring: boolean, recurringDate: string) => Promise<boolean>;
-  addNewPlannedPurchase: (item: string, amount: number) => Promise<boolean>;
+  addNewPlannedPurchase: (item: string, amount: number, dueDate?: string) => Promise<boolean>;
   markAsBought: (id: number, amount: number, item: string) => Promise<boolean>;
   deletePlannedPurchase: (id: number) => Promise<boolean>;
 }
@@ -122,8 +122,8 @@ export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return success;
   };
 
-  const addNewPlannedPurchase = async (item: string, amount: number): Promise<boolean> => {
-    const success = await addPlannedPurchase(item, amount);
+  const addNewPlannedPurchase = async (item: string, amount: number, dueDate?: string): Promise<boolean> => {
+    const success = await addPlannedPurchase(item, amount, dueDate);
     if (success) {
       await fetchData();
     }

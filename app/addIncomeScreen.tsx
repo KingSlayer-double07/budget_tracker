@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, Switch, FlatList, TouchableOpacity, Alert, ActivityIndicator, Pressable } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, StyleSheet, Switch, FlatList, TouchableOpacity, Alert, ActivityIndicator, Pressable, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useBudget } from './context/BudgetContext';
 import { NotificationService } from './services/NotificationService';
 import { clearIncomeTable } from './database';
 import ConfirmationModal from './components/ConfirmationModal';
+import { Swipeable } from 'react-native-gesture-handler';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function AddIncomeScreen() {
   const [source, setSource] = useState('');
@@ -14,14 +16,14 @@ export default function AddIncomeScreen() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [selectedIncome, setSelectedIncome] = useState<{ id: number; source: string; amount: number; is_recurring: boolean; recurring_date: string | null } | null>(null);
   const router = useRouter();
-  const { incomeList, isLoading, error, addNewIncome, refreshData } = useBudget();
+  const { incomeList, isLoading, error, addNewIncome, refreshData, deleteIncome } = useBudget();
   
   // Function to get the first day of the next month
   const getNextMonthDate = () => {
     const today = new Date();
     return new Date(today.getFullYear(), today.getMonth() + 1, 1).toISOString().split("T")[0];
   };
-
+  
   const handleSaveIncome = async () => {
     if (!source.trim() || !amount.trim()) {
       Alert.alert('Error', 'Please fill in all fields');
@@ -63,7 +65,7 @@ export default function AddIncomeScreen() {
 
         Alert.alert('Success', 'Income added successfully!');
         setSource('');
-        setAmount('');
+    setAmount('');
         setRecurringDate('');
       } else {
         Alert.alert('Error', 'Failed to add income. Please try again.');
@@ -86,6 +88,7 @@ export default function AddIncomeScreen() {
     try {
       const notificationService = NotificationService.getInstance();
       await notificationService.cancelFutureOccurrences(
+        selectedIncome.source,
         `recurring-income-${selectedIncome.source}-${selectedIncome.recurring_date}`
       );
       Alert.alert('Success', 'Future occurrences cancelled successfully');
@@ -96,22 +99,71 @@ export default function AddIncomeScreen() {
     }
   };
 
-  const renderIncomeItem = ({ item }: { item: { id: number; source: string; amount: number; is_recurring: boolean; recurring_date: string | null } }) => (
-    <Pressable
-      style={styles.incomeItem}
-      onLongPress={() => handleLongPress(item)}
-      delayLongPress={500}
+  const renderRightActions = (dragX: any, income: { id: number; source: string; amount: number; is_recurring: boolean; recurring_date: string | null }) => {
+    const scale = dragX.interpolate({
+      inputRange: [-100, 0],
+      outputRange: [1, 0],
+      extrapolate: 'clamp',
+    });
+
+    return (
+      <TouchableOpacity
+        style={styles.deleteButton}
+        onPress={() => handleDeleteIncome(income)}
+      >
+        <Ionicons name="trash-outline" size={24} color="white" />
+      </TouchableOpacity>
+    );
+  };
+
+  const handleDeleteIncome = async (income: { id: number; source: string; amount: number; is_recurring: boolean; recurring_date: string | null }) => {
+    Alert.alert(
+      'Delete Income',
+      'Are you sure you want to delete this income?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteIncome(income.id);
+              Alert.alert('Success', 'Income deleted successfully');
+            } catch (error) {
+              console.error('Error deleting income:', error);
+              Alert.alert('Error', 'Failed to delete income');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const renderIncomeItem = (income: { id: number; source: string; amount: number; is_recurring: boolean; recurring_date: string | null }) => (
+    <Swipeable
+      renderRightActions={(progress, dragX) => renderRightActions(dragX, income)}
+      rightThreshold={40}
     >
-      <View style={styles.incomeContent}>
-        <Text style={styles.incomeSource}>{item.source}</Text>
-        <Text style={styles.incomeAmount}>NGN{item.amount.toLocaleString()}</Text>
-        {item.is_recurring && item.recurring_date && (
-          <Text style={styles.recurringText}>
-            Recurring on day {item.recurring_date}
+      <View style={styles.incomeItem}>
+        <View style={styles.incomeInfo}>
+          <Text style={styles.incomeName}>{income.source}</Text>
+          <Text style={styles.incomeAmount}>NGN{income.amount.toLocaleString()}</Text>
+        </View>
+        <View style={styles.incomeDetails}>
+          <Text style={styles.incomeDate}>
+            {income.is_recurring ? `Recurring on day ${income.recurring_date}` : 'One-time income'}
           </Text>
-        )}
+          {income.is_recurring && (
+            <View style={styles.recurringBadge}>
+              <Text style={styles.recurringText}>Recurring</Text>
+            </View>
+          )}
+        </View>
       </View>
-    </Pressable>
+    </Swipeable>
   );
 
   if (isLoading) {
@@ -136,17 +188,17 @@ export default function AddIncomeScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
+      <TextInput
+        style={styles.input}
           placeholder="Income Source"
-          value={source}
-          onChangeText={setSource}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Amount"
-          value={amount}
-          onChangeText={setAmount}
+        value={source}
+        onChangeText={setSource}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Amount"
+        value={amount}
+        onChangeText={setAmount}
           keyboardType="numeric"
         />
         <View style={styles.switchContainer}>
@@ -171,7 +223,7 @@ export default function AddIncomeScreen() {
         <TouchableOpacity style={styles.button} onPress={handleSaveIncome}>
           <Text style={styles.buttonText}>Add Income</Text>
         </TouchableOpacity>
-      </View>
+            </View>
 
       <View style={styles.historyContainer}>
         <View style={styles.historyHeader}>
@@ -186,13 +238,9 @@ export default function AddIncomeScreen() {
             </Text>
           </TouchableOpacity>
         </View>
-        <FlatList
-          data={incomeList}
-          renderItem={renderIncomeItem}
-          keyExtractor={(item) => item.id.toString()}
-          style={styles.list}
-          showsVerticalScrollIndicator={false}
-        />
+            <ScrollView style={styles.listContainer}>
+          {incomeList.map((income) => renderIncomeItem(income))}
+        </ScrollView>
       </View>
 
       <ConfirmationModal
@@ -287,35 +335,67 @@ const styles = StyleSheet.create({
   clearButtonDisabled: {
     color: '#ccc',
   },
-  list: {
+  listContainer: {
     flex: 1,
   },
   incomeItem: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: 'white',
     padding: 15,
     borderRadius: 8,
     marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
   },
-  incomeContent: {
-    flexDirection: 'column',
-  },
-  incomeSource: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#043927',
+  incomeInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 5,
+  },
+  incomeName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
   },
   incomeAmount: {
     fontSize: 16,
-    color: '#28a745',
-    marginBottom: 5,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  incomeDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  incomeDate: {
+    fontSize: 14,
+    color: '#666',
+  },
+  recurringBadge: {
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
   recurringText: {
-    fontSize: 14,
-    color: '#6c757d',
-    fontStyle: 'italic',
+    fontSize: 12,
+    color: '#1976D2',
+    fontWeight: '500',
+  },
+  deleteButton: {
+    backgroundColor: '#ff3b30',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    height: '100%',
+    borderRadius: 8,
+    marginLeft: 10,
   },
   loadingContainer: {
     flex: 1,
@@ -334,7 +414,7 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     backgroundColor: '#043927',
-    padding: 10,
+    padding: 10, 
     borderRadius: 5,
   },
   retryButtonText: {

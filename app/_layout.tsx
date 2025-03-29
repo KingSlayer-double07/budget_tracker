@@ -1,22 +1,46 @@
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { handleRecurringUpdates, initializeDatabase } from "./database";
 import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import { BudgetProvider } from './context/BudgetContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { StyleSheet, View, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, ActivityIndicator, Text, TouchableOpacity, AppState, Alert } from 'react-native';
 import { NotificationService } from './services/NotificationService';
 import { AuthenticationService } from './services/AuthenticationService';
 import ExpoInsights from 'expo-insights';
+import { PasscodeModal } from './components/PasscodeModal';
 
-export default function RootLayout() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+function AppContent() {
   const [isLoading, setIsLoading] = useState(true);
-  const authService = AuthenticationService.getInstance();
+  const { 
+    isAuthenticated, 
+    authError, 
+    handleAuthentication, 
+    showPasscodeModal, 
+    isNewPasscode, 
+    handlePasscodeSubmit,
+    setShowPasscodeModal 
+  } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
     initializeApp();
   }, []);
+
+  // Handle app state changes
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', async (nextAppState: string) => {
+      if (nextAppState === 'active') {
+        // Re-authenticate when app comes to foreground
+        await handleAuthentication();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [handleAuthentication]);
 
   const initializeApp = async () => {
     try {
@@ -46,7 +70,7 @@ export default function RootLayout() {
 
           if (actionIdentifier === 'CANCEL_FUTURE' && data?.identifier) {
             try {
-              await notificationService.cancelFutureOccurrences(data.identifier);
+              await notificationService.cancelFutureOccurrences(data.selected , data.identifier);
               console.log('Future occurrences cancelled for:', data.identifier);
             } catch (error) {
               console.error('Error cancelling future occurrences:', error);
@@ -55,9 +79,8 @@ export default function RootLayout() {
         }
       );
 
-      // Check authentication
-      const authenticated = await authService.authenticate();
-      setIsAuthenticated(authenticated);
+      // Initial authentication check
+      await handleAuthentication();
 
       // Cleanup listeners on unmount
       return () => {
@@ -73,80 +96,138 @@ export default function RootLayout() {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#043927" />
       </View>
     );
   }
 
-  if (!isAuthenticated) {
-    return null; // Or show an authentication screen
-  }
-
   return (
     <GestureHandlerRootView style={styles.container}>
-      <BudgetProvider>
-        <Stack
-          screenOptions={{
-            headerStyle: {
-              backgroundColor: '#043927',
-            },
-            headerTintColor: '#fff',
-            headerTitleStyle: {
-              fontWeight: 'bold',
-            },
-          }}
-        >
-          <Stack.Screen
-            name="index"
-            options={{
-              title: 'Budget Tracker',
-              animation: 'slide_from_right',
+      {!isAuthenticated ? (
+        <View style={styles.authContainer}>
+          <Text style={styles.authTitle}>Budget Tracker</Text>
+          <Text style={styles.authMessage}>
+            {authError || 'Please authenticate to access your budget data'}
+          </Text>
+          <TouchableOpacity style={styles.authButton} onPress={handleAuthentication}>
+            <Text style={styles.authButtonText}>Authenticate</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <BudgetProvider>
+          <Stack
+            screenOptions={{
+              headerStyle: {
+                backgroundColor: '#043927',
+              },
+              headerTintColor: '#fff',
+              headerTitleStyle: {
+                fontWeight: 'bold',
+              },
             }}
-          />
-          <Stack.Screen
-            name="addIncomeScreen"
-            options={{
-              title: 'Add Income',
-              animation: 'slide_from_right',
-            }}
-          />
-          <Stack.Screen
-            name="addExpenseScreen"
-            options={{
-              title: 'Add Expense',
-              animation: 'slide_from_right',
-            }}
-          />
-          <Stack.Screen
-            name="addPurchaseScreen"
-            options={{
-              title: 'Add Purchase',
-              animation: 'slide_from_right',
-            }}
-          />
-          <Stack.Screen
-            name="plannedPurchasesScreen"
-            options={{
-              title: 'Planned Purchases',
-              animation: 'flip',
-            }}
-          />
-          <Stack.Screen
-            name="settingsScreen"
-            options={{
-              title: 'Settings',
-              animation: 'simple_push',
-            }}
-          />
-        </Stack>
-      </BudgetProvider>
+          >
+            <Stack.Screen
+              name="index"
+              options={{
+                title: 'Budget Tracker',
+                animation: 'slide_from_right',
+              }}
+            />
+            <Stack.Screen
+              name="addIncomeScreen"
+              options={{
+                title: 'Add Income',
+                animation: 'slide_from_right',
+              }}
+            />
+            <Stack.Screen
+              name="addExpenseScreen"
+              options={{
+                title: 'Add Expense',
+                animation: 'slide_from_right',
+              }}
+            />
+            <Stack.Screen
+              name="addPurchaseScreen"
+              options={{
+                title: 'Add Purchase',
+                animation: 'slide_from_right',
+              }}
+            />
+            <Stack.Screen
+              name="plannedPurchasesScreen"
+              options={{
+                title: 'Planned Purchases',
+                animation: 'flip',
+              }}
+            />
+            <Stack.Screen
+              name="settingsScreen"
+              options={{
+                title: 'Settings',
+                animation: 'simple_push',
+              }}
+            />
+          </Stack>
+        </BudgetProvider>
+      )}
+      <PasscodeModal
+        visible={showPasscodeModal}
+        isNewPasscode={isNewPasscode}
+        onCancel={() => setShowPasscodeModal(false)}
+        onSubmit={handlePasscodeSubmit}
+      />
     </GestureHandlerRootView>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f4f4f4',
+  },
+  authContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f4f4f4',
+    padding: 20,
+  },
+  authTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#043927',
+    marginBottom: 20,
+  },
+  authMessage: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 30,
+  },
+  authButton: {
+    backgroundColor: '#043927',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  authButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

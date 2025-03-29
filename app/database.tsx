@@ -29,6 +29,7 @@ interface PlannedPurchase {
   item: string;
   amount: number;
   purchased: number;
+  due_date: string | null;
 }
 
 interface Savings {
@@ -72,33 +73,57 @@ const validateString = (value: string, fieldName: string, maxLength: number = 10
   return { isValid: true };
 };
 
-const validateDate = (date: string): ValidationResult => {
-  const dateObj = new Date(date);
-  if (isNaN(dateObj.getTime())) {
-    return { isValid: false, error: "Invalid date format" };
+const validateFullDate = (date: string): ValidationResult => {
+  // Check if the date string matches YYYY-MM-DD format
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateRegex.test(date)) {
+    return { isValid: false, error: "Date must be in YYYY-MM-DD format" };
   }
+
+  // Parse the date components
+  const [year, month, day] = date.split('-').map(Number);
+  
+  // Validate year
+  if (year < 2000 || year > 2100) {
+    return { isValid: false, error: "Year must be between 2000 and 2100" };
+  }
+
+  // Validate month
+  if (month < 1 || month > 12) {
+    return { isValid: false, error: "Month must be between 1 and 12" };
+  }
+
+  // Validate day
+  const daysInMonth = new Date(year, month, 0).getDate();
+  if (day < 1 || day > daysInMonth) {
+    return { isValid: false, error: `Day must be between 1 and ${daysInMonth} for the given month` };
+  }
+
+  // Check if the date is in the future
+  const dateObj = new Date(year, month - 1, day);
   if (dateObj > new Date()) {
     return { isValid: false, error: "Date cannot be in the future" };
   }
+
   return { isValid: true };
 };
 
-const validateRecurringDate = (date: string): ValidationResult => {
-  if (!date) {
+const validateDayOfMonth = (day: string): ValidationResult => {
+  if (!day) {
     return { isValid: true, error: "" };
   }
 
   // For monthly recurring transactions, date should be in format "DD"
   const dayPattern = /^([1-9]|0[1-9]|[12][0-9]|3[01])$/;
-  if (!dayPattern.test(date)) {
+  if (!dayPattern.test(day)) {
     return { 
       isValid: false, 
       error: "Recurring date must be a valid day of the month (1-31)" 
     };
   }
 
-  const day = parseInt(date);
-  if (day < 1 || day > 31) {
+  const dayNum = parseInt(day);
+  if (dayNum < 1 || dayNum > 31) {
     return { 
       isValid: false, 
       error: "Recurring date must be between 1 and 31" 
@@ -123,7 +148,7 @@ export const initializeDatabase = async (): Promise<boolean> => {
   try {
     db = await SQLite.openDatabaseAsync(DB_NAME);
     await db.execAsync(`PRAGMA foreign_keys = ON;`);
-    
+
     // Create tables
     await db.execAsync(`
       CREATE TABLE IF NOT EXISTS income (
@@ -133,7 +158,7 @@ export const initializeDatabase = async (): Promise<boolean> => {
         date TEXT NOT NULL,
         is_recurring INTEGER DEFAULT 0,
         recurring_date TEXT
-      );
+    );
 
       CREATE TABLE IF NOT EXISTS expenses (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -142,14 +167,14 @@ export const initializeDatabase = async (): Promise<boolean> => {
         date TEXT NOT NULL,
         is_recurring INTEGER DEFAULT 0,
         recurring_date TEXT
-      );
+    );
 
       CREATE TABLE IF NOT EXISTS planned_purchases (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         item TEXT NOT NULL,
         amount REAL NOT NULL,
         purchased INTEGER DEFAULT 0
-      );
+    );
 
       CREATE TABLE IF NOT EXISTS savings (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -158,6 +183,19 @@ export const initializeDatabase = async (): Promise<boolean> => {
         date TEXT NOT NULL
       );
     `);
+
+    // Check if due_date column exists in planned_purchases table
+    const tableInfo = await db.getFirstAsync(
+      "SELECT name FROM pragma_table_info('planned_purchases') WHERE name = 'due_date'"
+    );
+
+    if (!tableInfo) {
+      // Add due_date column if it doesn't exist
+      await db.execAsync(`
+        ALTER TABLE planned_purchases ADD COLUMN due_date TEXT;
+      `);
+      console.log("Added due_date column to planned_purchases table");
+    }
 
     isInitialized = true;
     console.log("Database initialized successfully ✅");
@@ -196,7 +234,7 @@ const safeDatabaseOperation = async <T extends unknown>(
 };
 
 // Database operations with validation
-export const addPlannedPurchase = async (item: string, amount: number): Promise<boolean> => {
+export const addPlannedPurchase = async (item: string, amount: number, dueDate?: string): Promise<boolean> => {
   // Validate inputs
   const itemValidation = validateString(item, "Item name");
   if (!itemValidation.isValid) {
@@ -210,12 +248,21 @@ export const addPlannedPurchase = async (item: string, amount: number): Promise<
     return false;
   }
 
+  // Validate due date if provided
+  if (dueDate) {
+    const dateValidation = validateFullDate(dueDate);
+    if (!dateValidation.isValid) {
+      Alert.alert("Validation Error", dateValidation.error);
+      return false;
+    }
+  }
+
   return await safeDatabaseOperation(async (db) => {
     await db.runAsync(
-      `INSERT INTO planned_purchases (item, amount, purchased) VALUES (?, ?, 0);`,
-      [item.trim(), amount]
+      `INSERT INTO planned_purchases (item, amount, purchased, due_date) VALUES (?, ?, 0, ?);`,
+      [item.trim(), amount, dueDate || null]
     );
-    console.log(`Planned purchase added: ${item} - ${amount}`);
+    console.log(`Planned purchase added: ${item} - ${amount}${dueDate ? ` (Due: ${dueDate})` : ''}`);
     Alert.alert("Success", "Purchase added successfully!");
     router.push('/plannedPurchasesScreen');
     return true;
@@ -248,17 +295,17 @@ export const getExpenses = async () => {
 export const markPurchaseAsBought = async (id: number, amount: number, item: string): Promise<boolean> => {
   return await safeDatabaseOperation(async (db) => {
     const result = await db.getFirstAsync<PlannedPurchase>(
-      "SELECT * FROM planned_purchases WHERE id = ?",
-      [id]
-    );
-
+        "SELECT * FROM planned_purchases WHERE id = ?",
+        [id]
+      );
+  
     if (!result) {
       Alert.alert("Error", "Purchase not found");
       return false;
     }
-
+  
     if (result.purchased) {
-      Alert.alert("Already Bought", "This item has already been marked as bought.");
+        Alert.alert("Already Bought", "This item has already been marked as bought.");
       return false;
     }
 
@@ -273,13 +320,13 @@ export const markPurchaseAsBought = async (id: number, amount: number, item: str
       );
 
       // Check for existing expense
-      const existingExpense = await db.getFirstAsync(
-        "SELECT * FROM expenses WHERE item = ?",
-        [item]
-      );
+    const existingExpense = await db.getFirstAsync(
+      "SELECT * FROM expenses WHERE item = ?",
+      [item]
+    );
 
-      if (existingExpense) {
-        Alert.alert("Already Added", "This expense has already been recorded.");
+    if (existingExpense) {
+      Alert.alert("Already Added", "This expense has already been recorded.");
         await db.execAsync('ROLLBACK');
         return false;
       }
@@ -307,18 +354,18 @@ export const getTotalIncome = async (): Promise<number> => {
     return result?.total || 0;
   }) || 0;
 };
-
-export const getTotalExpenses = async (): Promise<number> => {
+  
+  export const getTotalExpenses = async (): Promise<number> => {
   return await safeDatabaseOperation(async (db) => {
     const result = await db.getFirstAsync<DatabaseResult>(`SELECT SUM(amount) as total FROM expenses;`);
     return result?.total || 0;
   }) || 0;
 };
-
-export const getBalance = async (): Promise<number> => {
-  const income = await getTotalIncome();
-  const expenses = await getTotalExpenses();
-  return income - expenses;
+  
+  export const getBalance = async (): Promise<number> => {
+    const income = await getTotalIncome();
+    const expenses = await getTotalExpenses();
+    return income - expenses;
 };
 
 export const addIncome = async (
@@ -341,7 +388,7 @@ export const addIncome = async (
   }
 
   if (isRecurring) {
-    const recurringDateValidation = validateRecurringDate(recurringDate);
+    const recurringDateValidation = validateDayOfMonth(recurringDate);
     if (!recurringDateValidation.isValid) {
       Alert.alert("Validation Error", recurringDateValidation.error);
       return false;
@@ -350,15 +397,15 @@ export const addIncome = async (
 
   return await safeDatabaseOperation(async (db) => {
     const date = new Date().toISOString().split('T')[0];
-    const recurringDates = isRecurring ? recurringDate : null;
+      const recurringDates = isRecurring ? recurringDate : null;
     
-    await db.runAsync(
+      await db.runAsync(
       `INSERT INTO income (source, amount, date, is_recurring, recurring_date) 
        VALUES (?, ?, ?, ?, ?);`,
       [source.trim(), amount, date, isRecurring ? 1 : 0, recurringDates]
     );
     
-    console.log(`Income added: ${source}, ${amount}`);
+      console.log(`Income added: ${source}, ${amount}`);
     Alert.alert("Success", "Income added successfully!");
     router.back();
     return true;
@@ -385,7 +432,7 @@ export const addExpense = async (
   }
 
   if (isRecurring) {
-    const recurringDateValidation = validateRecurringDate(recurringDate);
+    const recurringDateValidation = validateDayOfMonth(recurringDate);
     if (!recurringDateValidation.isValid) {
       Alert.alert("Validation Error", recurringDateValidation.error);
       return false;
@@ -397,7 +444,7 @@ export const addExpense = async (
     const recurringDates = isRecurring ? recurringDate : null;
     
     await db.runAsync(
-      'INSERT INTO expenses (item, amount, date, is_recurring, recurring_date) VALUES (?, ?, ?, ?, ?)',
+    'INSERT INTO expenses (item, amount, date, is_recurring, recurring_date) VALUES (?, ?, ?, ?, ?)',
       [item.trim(), amount, date, isRecurring ? 1 : 0, recurringDates]
     );
     
@@ -427,15 +474,15 @@ export const addExpense = async (
 
 export const deletePurchase = async (key: number): Promise<boolean> => {
   return await safeDatabaseOperation(async (db) => {
-    await db.runAsync(
-      `DELETE FROM planned_purchases WHERE id = ?;`,
-      [key]
-    );
-    console.log(`Purchase with ID ${key} deleted successfully`);
+          await db.runAsync(
+            `DELETE FROM planned_purchases WHERE id = ?;`, 
+            [key]
+          );
+          console.log(`Purchase with ID ${key} deleted successfully`);
     return true;
   }) || false;
 };
-
+  
 export const handleRecurringUpdates = async () => {
   const today = new Date();
   const currentDay = today.getDate();
@@ -447,21 +494,21 @@ export const handleRecurringUpdates = async () => {
     for (const income of recurringIncome) {
       if (income.recurring_date && parseInt(income.recurring_date) === currentDay) {
         await db.runAsync(
-          'INSERT INTO income (amount, source, date, is_recurring, recurring_date) VALUES (?, ?, ?, ?, ?)',
+        'INSERT INTO income (amount, source, date, is_recurring, recurring_date) VALUES (?, ?, ?, ?, ?)',
           [income.amount, income.source, today.toISOString().split('T')[0], 1, income.recurring_date]
-        );
-      }
+      );
     }
+  }
 
-    // Process recurring expenses
+  // Process recurring expenses
     if (!db) return;
     const recurringExpenses = await db.getAllAsync<Expense>('SELECT * FROM expenses WHERE is_recurring = 1');
-    for (const expense of recurringExpenses) {
+  for (const expense of recurringExpenses) {
       if (expense.recurring_date && parseInt(expense.recurring_date) === currentDay) {
-        await db.runAsync(
+      await db.runAsync(
           'INSERT INTO expenses (amount, item, date, is_recurring, recurring_date) VALUES (?, ?, ?, ?, ?)',
           [expense.amount, expense.item, today.toISOString().split('T')[0], 1, expense.recurring_date]
-        );
+      );
       }
     }
   } catch (error) {

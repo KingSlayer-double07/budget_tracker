@@ -37,7 +37,8 @@ export default function AddPurchaseScreen() {
             'Planned Purchase Due',
             `Your planned purchase of ${item} for NGN${numericAmount.toLocaleString()} is due on ${notificationDate.toLocaleDateString()}`,
             notificationDate,
-            `planned-purchase-${item}-${dueDate}`
+            `planned-purchase-${item}-${dueDate}`,
+            item
           );
         }
 
@@ -100,7 +101,7 @@ export default function AddPurchaseScreen() {
       </View>
 
       <View style={styles.inputContainer}>
-        <Text style={styles.label}>Due Date (YYYY-MM-DD)</Text>
+        <Text style={styles.label}>Due Date: YYYY-MM-DD (optional)</Text>
         <TextInput
           style={styles.input}
           value={dueDate}

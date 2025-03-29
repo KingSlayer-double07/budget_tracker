@@ -21,6 +21,11 @@ export default function SettingsScreen() {
     try {
       const secureStorage = SecureStorageService.getInstance();
       
+      // Check biometric availability
+      const isAvailable = true;
+      //await authService.isBiometricAvailable()
+      setBiometricAvailable(isAvailable);
+      
       // Load biometric settings
       const biometricEnabled = await secureStorage.getSecureItem('biometric_enabled');
       setBiometricEnabled(biometricEnabled === 'true');

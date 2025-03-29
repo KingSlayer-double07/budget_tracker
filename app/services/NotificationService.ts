@@ -154,7 +154,7 @@ export class NotificationService {
   }
 
   // Cancel future occurrences of a recurring transaction
-  public async cancelFutureOccurrences(identifier: string): Promise<void> {
+  public async cancelFutureOccurrences(selected: string, identifier: string): Promise<void> {
     try {
       // Cancel the recurring notification
       await this.cancelNotification(`${identifier}-recurring`);
@@ -163,7 +163,7 @@ export class NotificationService {
       await Notifications.scheduleNotificationAsync({
         content: {
           title: 'Recurring Transaction Cancelled',
-          body: 'Future occurrences of this recurring transaction have been cancelled.',
+          body: `Future occurrences of this recurring transaction "${selected}" have been cancelled.`,
           sound: true,
           data: { type: 'RECURRING_TRANSACTION_CANCELLED', identifier },
         },
@@ -205,13 +205,14 @@ export class NotificationService {
     title: string,
     body: string,
     dueDate: Date,
-    identifier: string
+    identifier: string,
+    item: string
   ): Promise<void> {
     // Send immediate notification
     await Notifications.scheduleNotificationAsync({
       content: {
         title: 'Purchase Added',
-        body: `Your planned purchase "${title}" has been added to your list. Due date: ${dueDate.toLocaleDateString()}`,
+        body: `Your planned purchase "${item}" has been added to your list. Due date: ${dueDate.toLocaleDateString()}`,
         sound: true,
         data: { type: 'PURCHASE_ADDED', identifier },
       },
@@ -225,10 +226,11 @@ export class NotificationService {
 
     // Ensure the reminder date is in the future
     if (reminderDate > new Date()) {
+      console.log('Reminder Date: ', reminderDate);
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: 'Upcoming Purchase',
-          body: `Your planned purchase "${title}" is due tomorrow`,
+          title,
+          body,
           sound: true,
           data: { type: 'PURCHASE_REMINDER', identifier },
         },
@@ -244,6 +246,18 @@ export class NotificationService {
   // Cancel a specific notification
   public async cancelNotification(identifier: string): Promise<void> {
     await Notifications.cancelScheduledNotificationAsync(identifier);
+  }
+
+  public async testNotification(): Promise<void> {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "Test Notification",
+        body: "This is a test notification sent from a debugging button",
+        sound: true,
+        data: { type: 'PURCHASE_REMINDER'}
+      },
+      trigger: null
+    });
   }
 
   // Cancel all notifications

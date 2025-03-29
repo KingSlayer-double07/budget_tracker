@@ -15,7 +15,7 @@ export default function AddExpenseScreen() {
   const [selectedExpense, setSelectedExpense] = useState<{ id: number; item: string; amount: number; is_recurring: boolean; recurring_date: string | null } | null>(null);
   const router = useRouter();
   const { expenseList, isLoading, error, addNewExpense, refreshData } = useBudget();
-  
+
   const handleSaveExpense = async () => {
     if (!description.trim() || !amount.trim()) {
       Alert.alert('Error', 'Please fill in all fields');
@@ -57,7 +57,7 @@ export default function AddExpenseScreen() {
 
         Alert.alert('Success', 'Expense added successfully!');
         setDescription('');
-        setAmount('');
+    setAmount('');
         setRecurringDate('');
       } else {
         Alert.alert('Error', 'Failed to add expense. Please try again.');
@@ -80,6 +80,7 @@ export default function AddExpenseScreen() {
     try {
       const notificationService = NotificationService.getInstance();
       await notificationService.cancelFutureOccurrences(
+        selectedExpense.item,
         `recurring-expense-${selectedExpense.item}-${selectedExpense.recurring_date}`
       );
       Alert.alert('Success', 'Future occurrences cancelled successfully');
@@ -130,18 +131,18 @@ export default function AddExpenseScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
+      <TextInput
+        style={styles.input}
           placeholder="Expense Description"
           value={description}
           onChangeText={setDescription}
-        />
-        <TextInput
+      />
+      <TextInput
           style={styles.input}
-          placeholder="Amount"
-          value={amount}
-          onChangeText={setAmount}
-          keyboardType="numeric"
+        placeholder="Amount"
+        value={amount}
+        onChangeText={setAmount}
+        keyboardType="numeric"
         />
         <View style={styles.switchContainer}>
           <Text style={styles.switchLabel}>Recurring Expense</Text>
@@ -154,7 +155,7 @@ export default function AddExpenseScreen() {
         </View>
         {isRecurring && (
           <TextInput
-            style={styles.input}
+        style={styles.input}
             placeholder="Day of month (1-31)"
             value={recurringDate}
             onChangeText={setRecurringDate}
@@ -180,14 +181,14 @@ export default function AddExpenseScreen() {
             </Text>
           </TouchableOpacity>
         </View>
-        <FlatList
+            <FlatList
           data={expenseList}
           renderItem={renderExpenseItem}
-          keyExtractor={(item) => item.id.toString()}
+              keyExtractor={(item) => item.id.toString()}
           style={styles.list}
           showsVerticalScrollIndicator={false}
         />
-      </View>
+                </View>
 
       <ConfirmationModal
         visible={showCancelModal}
@@ -323,7 +324,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#dc3545',
-    fontSize: 16,
+    fontSize: 16, 
     marginBottom: 20,
   },
   retryButton: {

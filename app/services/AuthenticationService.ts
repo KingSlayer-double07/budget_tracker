@@ -1,6 +1,6 @@
 import * as LocalAuthentication from 'expo-local-authentication';
 import { SecureStorageService } from './SecureStorageService';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 
 export class AuthenticationService {
   private static instance: AuthenticationService;
@@ -77,79 +77,45 @@ export class AuthenticationService {
 
   private async getPasscode(): Promise<string | null> {
     try {
-      return await this.secureStorage.getSecureItem(this.PASSCODE_KEY);
+      const passcode = await this.secureStorage.getSecureItem(this.PASSCODE_KEY);
+      console.log("passcode: ", passcode);
+      return passcode;
     } catch (error) {
       console.error('Error getting passcode:', error);
       return null;
     }
   }
 
-  private async authenticateWithPasscode(): Promise<boolean> {
-    return new Promise(async (resolve) => {
+  public async hasPasscode(): Promise<boolean> {
+    try {
+      const passcode = await this.getPasscode();
+      return passcode !== null;
+    } catch (error) {
+      console.error('Error checking passcode existence:', error);
+      return false;
+    }
+  }
+
+  public async authenticateWithPasscode(passcode: string): Promise<boolean> {
+    try {
       const storedPasscode = await this.getPasscode();
       
       if (!storedPasscode) {
-        // If no passcode is set, prompt to create one
-        Alert.prompt(
-          'Set Passcode',
-          'Please enter a 4-digit passcode to secure your app',
-          [
-            {
-              text: 'Cancel',
-              onPress: () => resolve(false),
-              style: 'cancel'
-            },
-            {
-              text: 'OK',
-              onPress: async (passcode) => {
-                if (passcode && /^\d{4}$/.test(passcode)) {
-                  await this.setPasscode(passcode);
-                  resolve(true);
-                } else {
-                  Alert.alert('Invalid Passcode', 'Please enter a 4-digit passcode');
-                  resolve(false);
-                }
-              }
-            }
-          ],
-          'secure-text'
-        );
+        // If no passcode is set, save the new one
+        await this.setPasscode(passcode);
+        return true;
       } else {
-        // If passcode exists, prompt to enter it
-        Alert.prompt(
-          'Enter Passcode',
-          'Please enter your 4-digit passcode',
-          [
-            {
-              text: 'Cancel',
-              onPress: () => resolve(false),
-              style: 'cancel'
-            },
-            {
-              text: 'OK',
-              onPress: (passcode) => {
-                if (passcode === storedPasscode) {
-                  resolve(true);
-                } else {
-                  Alert.alert('Incorrect Passcode', 'Please try again');
-                  resolve(false);
-                }
-              }
-            }
-          ],
-          'secure-text'
-        );
+        // If passcode exists, verify it
+        return passcode === storedPasscode;
       }
-    });
+    } catch (error) {
+      console.error('Error during passcode authentication:', error);
+      return false;
+    }
   }
 
   public async authenticate(): Promise<boolean> {
     try {
-      const isEnabled = await this.isBiometricEnabled();
-      if (!isEnabled) {
-        return true; // If biometrics are not enabled, allow access
-      }
-
       const isAvailable = await this.isBiometricAvailable();
       if (isAvailable) {
         // Try biometric authentication first
@@ -157,13 +123,16 @@ export class AuthenticationService {
         if (biometricResult) {
           return true;
         }
+        // If biometrics fail, fall back to passcode
+        return false; // The UI will handle showing the passcode modal
+      } else {
+        // If biometrics are not available, fall back to passcode
+        console.log('Biometrics not available, falling back to passcode');
+        return false; // The UI will handle showing the passcode modal
       }
-
-      // If biometrics fail or are not available, fall back to passcode
-      return await this.authenticateWithPasscode();
     } catch (error) {
       console.error('Error during authentication:', error);
-      return false;
+      return false; // The UI will handle showing the passcode modal
     }
   }
 } 

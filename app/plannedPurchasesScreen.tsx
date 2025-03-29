@@ -154,7 +154,7 @@ export default function PlannedPurchasesScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.listHeader}>
-        <Text style={styles.heading}>Planned Purchases</Text>
+      <Text style={styles.heading}>Planned Purchases</Text>
         <TouchableOpacity 
           style={[styles.clearButton, plannedPurchases.length === 0 && styles.clearButtonDisabled]} 
           onPress={handleClearPurchases}
@@ -214,9 +214,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  heading: {
+  heading: { 
     fontSize: 22,
-    fontWeight: 'bold',
+    fontWeight: 'bold', 
     marginBottom: 20,
     color: '#333',
   },
@@ -263,8 +263,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     textAlign: 'right',
-  },
-  deleteText: {
+    },
+    deleteText: { 
     fontSize: 14,
     color: '#666',
     textAlign: 'left'

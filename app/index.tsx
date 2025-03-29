@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, A
 import { useRouter } from "expo-router";
 import { useBudget } from './context/BudgetContext';
 import { NotificationService } from './services/NotificationService';
+import { useAuth } from './context/AuthContext';
 
 export default function Index() {
   const router = useRouter();
@@ -14,6 +15,9 @@ export default function Index() {
     error,
     refreshData
   } = useBudget();
+  const {
+    handleAuthentication
+  } = useAuth();
 
   const [refreshing, setRefreshing] = React.useState(false);
 
@@ -93,9 +97,9 @@ export default function Index() {
         <TouchableOpacity style={styles.button} onPress={() => router.push('/addPurchaseScreen')}>
           <Text style={styles.buttonText}>Manage Purchases</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.button, styles.testButton]} onPress={testNotification}>
+        {<TouchableOpacity style={[styles.button, styles.testButton]} onPress={testNotification}>
           <Text style={styles.buttonText}>Test Notification</Text>
-        </TouchableOpacity>
+        </TouchableOpacity>}
       </View>
     </ScrollView>
   );

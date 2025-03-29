@@ -5,6 +5,7 @@ import { useBudget } from './context/BudgetContext';
 import { NotificationService } from './services/NotificationService';
 import { clearExpensesTable } from './database';
 import ConfirmationModal from './components/ConfirmationModal';
+import { Swipeable } from 'react-native-gesture-handler';
 
 export default function AddExpenseScreen() {
   const [description, setDescription] = useState('');
@@ -14,7 +15,7 @@ export default function AddExpenseScreen() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<{ id: number; item: string; amount: number; is_recurring: boolean; recurring_date: string | null } | null>(null);
   const router = useRouter();
-  const { expenseList, isLoading, error, addNewExpense, refreshData } = useBudget();
+  const { expenseList, isLoading, error, addNewExpense, refreshData, deleteSelectedExpense } = useBudget();
 
   const handleSaveExpense = async () => {
     if (!description.trim() || !amount.trim()) {
@@ -74,6 +75,42 @@ export default function AddExpenseScreen() {
     }
   };
 
+  const handleDelete = async (id: number) => {
+    Alert.alert(
+      "Delete Expense",
+      "Are you sure you want to delete this expense?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            const success = await deleteSelectedExpense(id);
+            if (success) {
+              Alert.alert("Success", "Expense deleted successfully!");
+            } else {
+              Alert.alert("Error", "Failed to delete expense. Please try again.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const renderRightActions = (item: any) => {
+    return (
+      <TouchableOpacity
+        style={styles.leftAction}
+        onPress={() => handleDelete(item.id)}
+      >
+        <Text style={styles.actionText}>Delete</Text>
+      </TouchableOpacity>
+    );
+  };
+
   const handleCancelFutureOccurrences = async () => {
     if (!selectedExpense) return;
 
@@ -92,6 +129,11 @@ export default function AddExpenseScreen() {
   };
 
   const renderExpenseItem = ({ item }: { item: { id: number; item: string; amount: number; is_recurring: boolean; recurring_date: string | null } }) => (
+    <Swipeable
+      renderRightActions={() => renderRightActions(item)}
+      rightThreshold={40}
+      overshootRight={true}
+    >
     <Pressable
       style={styles.expenseItem}
       onLongPress={() => handleLongPress(item)}
@@ -107,6 +149,7 @@ export default function AddExpenseScreen() {
         )}
       </View>
     </Pressable>
+    </Swipeable>
   );
 
   if (isLoading) {
@@ -335,5 +378,19 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: 'white',
     fontSize: 16,
+  },
+  leftAction: {
+    backgroundColor: '#dc3545',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 100,
+    height: '100%',
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  actionText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });

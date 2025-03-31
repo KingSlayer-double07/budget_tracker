@@ -139,15 +139,25 @@ const DB_NAME = 'budgetTracker.db';
 // Database connection management
 let db: SQLite.SQLiteDatabase | null = null;
 let isInitialized = false;
+let isConnecting = false;
 
 export const initializeDatabase = async (): Promise<boolean> => {
   if (isInitialized) {
     return true;
   }
 
+  if (isConnecting) {
+    // Wait for the existing connection attempt to complete
+    await delay(1000);
+    return isInitialized;
+  }
+
+  isConnecting = true;
+
   try {
     db = await SQLite.openDatabaseAsync(DB_NAME);
     await db.execAsync(`PRAGMA foreign_keys = ON;`);
+    await db.execAsync(`PRAGMA busy_timeout = 5000;`); // Set busy timeout to 5 seconds
 
     // Create tables
     await db.execAsync(`
@@ -158,7 +168,7 @@ export const initializeDatabase = async (): Promise<boolean> => {
         date TEXT NOT NULL,
         is_recurring INTEGER DEFAULT 0,
         recurring_date TEXT
-    );
+      );
 
       CREATE TABLE IF NOT EXISTS expenses (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -167,14 +177,15 @@ export const initializeDatabase = async (): Promise<boolean> => {
         date TEXT NOT NULL,
         is_recurring INTEGER DEFAULT 0,
         recurring_date TEXT
-    );
+      );
 
       CREATE TABLE IF NOT EXISTS planned_purchases (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         item TEXT NOT NULL,
         amount REAL NOT NULL,
-        purchased INTEGER DEFAULT 0
-    );
+        purchased INTEGER DEFAULT 0,
+        due_date TEXT
+      );
 
       CREATE TABLE IF NOT EXISTS savings (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -207,6 +218,8 @@ export const initializeDatabase = async (): Promise<boolean> => {
       "Failed to initialize the database. Please restart the app."
     );
     return false;
+  } finally {
+    isConnecting = false;
   }
 };
 
@@ -232,6 +245,9 @@ const safeDatabaseOperation = async <T extends unknown>(
     return null;
   }
 };
+
+// Add a delay between operations to prevent database locks
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Database operations with validation
 export const addPlannedPurchase = async (item: string, amount: number, dueDate?: string): Promise<boolean> => {
@@ -474,11 +490,36 @@ export const addExpense = async (
 
 export const deletePurchase = async (key: number): Promise<boolean> => {
   return await safeDatabaseOperation(async (db) => {
-          await db.runAsync(
-            `DELETE FROM planned_purchases WHERE id = ?;`, 
-            [key]
-          );
-          console.log(`Purchase with ID ${key} deleted successfully`);
+    await db.runAsync(
+      `DELETE FROM planned_purchases WHERE id = ?;`,
+      [key]
+    );
+    await delay(100); // Add a small delay
+    console.log(`Purchase with ID ${key} deleted successfully`);
+    return true;
+  }) || false;
+};
+
+export const deleteIncome = async (key: number): Promise<boolean> => {
+  return await safeDatabaseOperation(async (db) => {
+    await db.runAsync(
+      `DELETE FROM income WHERE id = ?;`,
+      [key]
+    );
+    await delay(100); // Add a small delay
+    console.log(`Income with ID ${key} deleted successfully`);
+    return true;
+  }) || false;
+};
+
+export const deleteExpense = async (key: number): Promise<boolean> => {
+  return await safeDatabaseOperation(async (db) => {
+    await db.runAsync(
+      `DELETE FROM expenses WHERE id = ?;`,
+      [key]
+    );
+    await delay(100); // Add a small delay
+    console.log(`Expense with ID ${key} deleted successfully`);
     return true;
   }) || false;
 };

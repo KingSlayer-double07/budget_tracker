@@ -11,6 +11,8 @@ import {
   addPlannedPurchase,
   markPurchaseAsBought,
   deletePurchase,
+  deleteIncome,
+  deleteExpense,
   handleRecurringUpdates
 } from '../database';
 
@@ -29,6 +31,8 @@ interface BudgetContextType {
   addNewPlannedPurchase: (item: string, amount: number, dueDate?: string) => Promise<boolean>;
   markAsBought: (id: number, amount: number, item: string) => Promise<boolean>;
   deletePlannedPurchase: (id: number) => Promise<boolean>;
+  deleteSelectedIncome: (id: number) => Promise<boolean>;
+  deleteSelectedExpense: (id: number) => Promise<boolean>;
 }
 
 const BudgetContext = createContext<BudgetContextType | undefined>(undefined);
@@ -142,6 +146,28 @@ export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const success = await deletePurchase(id);
     if (success) {
       await fetchData();
+    } else {
+      setError('Failed to delete planned purchase');
+    }
+    return success;
+  };
+
+  const deleteSelectedIncome = async (id: number): Promise<boolean> => {
+    const success = await deleteIncome(id);
+    if (success) {
+      await fetchData();
+    } else {
+      setError('Failed to delete income');
+    }
+    return success;
+  };
+
+  const deleteSelectedExpense = async (id: number): Promise<boolean> => {
+    const success = await deleteExpense(id);
+    if (success) {
+      await fetchData();
+    } else {
+      setError('Failed to delete expense');
     }
     return success;
   };
@@ -162,7 +188,9 @@ export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         addNewExpense,
         addNewPlannedPurchase,
         markAsBought,
-        deletePlannedPurchase
+        deletePlannedPurchase,
+        deleteSelectedIncome,
+        deleteSelectedExpense
       }}
     >
       {children}

@@ -143,7 +143,7 @@ export default function SettingsScreen() {
   const handleClearDatabase = async () => {
     Alert.alert(
       'Clear All Data',
-      'Are you sure you want to clear all data? This action cannot be undone.',
+      'Are you sure you want to clear all data? This action is irreversible.',
       [
         {
           text: 'Cancel',
@@ -178,7 +178,7 @@ export default function SettingsScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Security</Text>
         <View style={styles.setting}>
-          <Text style={styles.settingLabel}>Biometric Authentication</Text>
+          <Text style={styles.settingLabel}>Budget Security</Text>
           <Switch
             value={biometricEnabled}
             onValueChange={toggleBiometric}
@@ -187,7 +187,7 @@ export default function SettingsScreen() {
         </View>
         {!biometricEnabled && (
           <Text style={styles.warning}>
-            Biometric authentication is not available on this device
+            Authentication is not enabled.
           </Text>
         )}
       </View>

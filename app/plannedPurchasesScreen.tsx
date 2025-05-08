@@ -263,8 +263,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     textAlign: 'left',
-    },
-    deleteText: { 
+  },
+  deleteText: { 
     fontSize: 14,
     color: '#666',
     textAlign: 'right'

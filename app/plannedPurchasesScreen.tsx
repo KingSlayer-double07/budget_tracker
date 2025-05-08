@@ -121,11 +121,11 @@ export default function PlannedPurchasesScreen() {
           <Text style={styles.purchaseAmount}>NGN{item.amount.toLocaleString()}</Text>
         </View>
         <View style={styles.purchaseInfo}>
-          <Text style={styles.deleteText}>
-            Swipe left to delete
-          </Text>
         <Text style={styles.purchaseStatus}>
           {item.purchased ? "✅ Bought" : "🛒 Swipe right to buy"}
+        </Text>
+        <Text style={styles.deleteText}>
+          Swipe left to delete
         </Text>
         </View>
       </View>
@@ -262,12 +262,12 @@ const styles = StyleSheet.create({
   purchaseStatus: {
     fontSize: 14,
     color: '#666',
-    textAlign: 'right',
+    textAlign: 'left',
     },
     deleteText: { 
     fontSize: 14,
     color: '#666',
-    textAlign: 'left'
+    textAlign: 'right'
   },
   rightAction: {
     backgroundColor: '#28a745',

@@ -15,6 +15,7 @@ export const PasscodeModal: React.FC<PasscodeModalProps> = ({
   onSubmit,
 }) => {
   const [passcode, setPasscode] = useState('');
+  const [isWrong, setIsWrong] = useState(false);
 
   const handleSubmit = () => {
     if (passcode.length !== 4 || !/^\d+$/.test(passcode)) {
@@ -22,6 +23,7 @@ export const PasscodeModal: React.FC<PasscodeModalProps> = ({
     }
     onSubmit(passcode);
     setPasscode('');
+    setIsWrong(true);
   };
 
   return (
@@ -35,6 +37,12 @@ export const PasscodeModal: React.FC<PasscodeModalProps> = ({
           <Text style={styles.title}>
             {isNewPasscode ? 'Set Passcode' : 'Enter Passcode'}
           </Text>
+            {isWrong && (
+              <Text style = {styles.wrong}>
+                You entered a wrong passcode. Give it another try
+                </Text>
+              )
+            }
           <TextInput
             style={styles.input}
             secureTextEntry
@@ -50,12 +58,12 @@ export const PasscodeModal: React.FC<PasscodeModalProps> = ({
             placeholder="Enter 4-digit passcode"
           />
           <View style={styles.buttonContainer}>
-            <TouchableOpacity
+            {/*<TouchableOpacity
               style={styles.button}
               onPress={onCancel}
             >
               <Text style={styles.buttonText}>Cancel</Text>
-            </TouchableOpacity>
+            </TouchableOpacity>*/}
             <TouchableOpacity
               style={styles.button}
               onPress={handleSubmit}
@@ -108,4 +116,10 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     fontSize: 16,
   },
+  wrong: {
+    color: '#007AFF',
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 5
+  }
 }); 

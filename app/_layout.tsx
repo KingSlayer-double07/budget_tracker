@@ -7,8 +7,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet, View, ActivityIndicator, Text, TouchableOpacity, AppState, Alert } from 'react-native';
 import { NotificationService } from './services/NotificationService';
-import { AuthenticationService } from './services/AuthenticationService';
-import ExpoInsights from 'expo-insights';
+//import { AuthenticationService } from './services/AuthenticationService';
 import { PasscodeModal } from './components/PasscodeModal';
 
 function AppContent() {
@@ -23,6 +22,7 @@ function AppContent() {
     setShowPasscodeModal 
   } = useAuth();
   const router = useRouter();
+  const [authenticated, setAuthenticated] = useState(false);
 
   useEffect(() => {
     initializeApp();
@@ -47,6 +47,8 @@ function AppContent() {
       // Initialize database
       await initializeDatabase();
       
+      // Set Authentication
+      setAuthenticated(isAuthenticated);
       // Handle recurring updates
       handleRecurringUpdates();
 
@@ -101,6 +103,7 @@ function AppContent() {
       </View>
     );
   }
+
 
   return (
     <GestureHandlerRootView style={styles.container}>
@@ -175,7 +178,7 @@ function AppContent() {
       <PasscodeModal
         visible={showPasscodeModal}
         isNewPasscode={isNewPasscode}
-        onCancel={() => setShowPasscodeModal(false)}
+        onCancel={() => {setAuthenticated(false), setShowPasscodeModal(false)}}
         onSubmit={handlePasscodeSubmit}
       />
     </GestureHandlerRootView>

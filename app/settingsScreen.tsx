@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Switch, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { ScrollView, View, Text, StyleSheet, Switch, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { AuthenticationService } from './services/AuthenticationService';
 import { SecureStorageService } from './services/SecureStorageService';
 import { NotificationService } from './services/NotificationService';
@@ -10,6 +10,8 @@ export default function SettingsScreen() {
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [budgetThreshold, setBudgetThreshold] = useState('');
+  const [hasPasscode, setHasPasscode] = useState(false);
+  const [newPasscode, setNewPasscode] = useState('');
   const { totalIncome, refreshData } = useBudget();
   const authService = AuthenticationService.getInstance();
 
@@ -22,8 +24,7 @@ export default function SettingsScreen() {
       const secureStorage = SecureStorageService.getInstance();
       
       // Check biometric availability
-      const isAvailable = true;
-      //await authService.isBiometricAvailable()
+      const isAvailable = await authService.isBiometricAvailable()
       setBiometricAvailable(isAvailable);
       
       // Load biometric settings
@@ -40,6 +41,15 @@ export default function SettingsScreen() {
         setBudgetThreshold(defaultThreshold);
         await secureStorage.saveSecureItem('budget_threshold', defaultThreshold);
       }
+
+      //Load Passcode
+      const hasPasscode = await authService.hasPasscode();
+      if (hasPasscode){
+        setNewPasscode(await authService.getPasscode());
+        setHasPasscode(true);
+      } else {
+        setHasPasscode(false);
+      }
     } catch (error) {
       console.error('Error loading settings:', error);
       Alert.alert('Error', 'Failed to load settings');
@@ -52,15 +62,16 @@ export default function SettingsScreen() {
       const newValue = !biometricEnabled;
       
       await secureStorage.saveSecureItem('biometric_enabled', newValue.toString());
+      await authService.saveBiometricPreference(newValue);
       setBiometricEnabled(newValue);
       
       Alert.alert(
         'Success',
-        `Biometric authentication ${newValue ? 'enabled' : 'disabled'}`
+        `Authentication ${newValue ? 'enabled' : 'disabled'}`
       );
     } catch (error) {
-      console.error('Error toggling biometric:', error);
-      Alert.alert('Error', 'Failed to update biometric settings');
+      console.error('Error toggling authentication:', error);
+      Alert.alert('Error', 'Failed to update authentication settings');
     }
   };
 
@@ -89,6 +100,45 @@ export default function SettingsScreen() {
       Alert.alert('Error', 'Failed to update budget threshold');
     }
   };
+
+  const changePasscode = async () => {
+    try {
+      if (newPasscode.length !== 4 || !/^\d+$/.test(newPasscode)) {
+        Alert.alert('Error', 'Invalid Passcode');
+        return;
+      }
+      authService.setPasscode(newPasscode);
+      Alert.alert('Success', 'Passcode change successfull');
+    } catch (error) {
+      console.error('Error Changing Passcode:', error);
+      Alert.alert('Error', 'Failed to change passcode');
+    }
+  };
+
+  const handleDelete = async () => {
+    Alert.alert(
+      'Reset Passcode',
+      'Are you sure you want to remove passcode?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: () => {
+            try {
+              authService.delPasscode();
+              loadSettings();
+            } catch (error) {
+              Alert.alert('Error', 'Action Unsuccessfull');
+            }
+          }
+        }
+      ]
+    )
+  }
 
   const handleClearDatabase = async () => {
     Alert.alert(
@@ -122,7 +172,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <Text style={styles.heading}>Settings</Text>
       
       <View style={styles.section}>
@@ -132,10 +182,10 @@ export default function SettingsScreen() {
           <Switch
             value={biometricEnabled}
             onValueChange={toggleBiometric}
-            disabled={!biometricAvailable}
+            //disabled={!biometricAvailable}
           />
         </View>
-        {!biometricAvailable && (
+        {!biometricEnabled && (
           <Text style={styles.warning}>
             Biometric authentication is not available on this device
           </Text>
@@ -159,6 +209,24 @@ export default function SettingsScreen() {
         </TouchableOpacity>
       </View>
 
+      {hasPasscode && biometricEnabled && (<View style={styles.section}>
+        <TouchableOpacity onPress={handleDelete}><Text style={styles.sectionTitle}>Reset Passcode</Text></TouchableOpacity>
+        <View style={styles.setting}>
+          <Text style={styles.settingLabel}>Input new passcode</Text>
+          <TextInput
+            style={styles.input}
+            value={newPasscode}
+            onChangeText={setNewPasscode}
+            keyboardType="numeric"
+            placeholder={newPasscode}
+          />
+        </View>
+        <TouchableOpacity style={styles.button} onPress={changePasscode}>
+          <Text style={styles.buttonText}>Change Passcode</Text>
+        </TouchableOpacity>
+      </View>
+      )}
+
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Database Management</Text>
         <TouchableOpacity 
@@ -168,7 +236,7 @@ export default function SettingsScreen() {
           <Text style={styles.buttonText}>Clear All Data</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 

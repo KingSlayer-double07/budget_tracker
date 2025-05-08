@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState } from 'react';
 import { AuthenticationService } from '../services/AuthenticationService';
+import { SecureStorageService } from '../services/SecureStorageService';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -18,6 +19,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [authError, setAuthError] = useState<string | null>(null);
   const [showPasscodeModal, setShowPasscodeModal] = useState(false);
   const [isNewPasscode, setIsNewPasscode] = useState(false);
+  const [authEnabled, setAuthEnabled] = useState(false);
   const authService = AuthenticationService.getInstance();
 
   const handlePasscodeSubmit = async (passcode: string) => {
@@ -37,7 +39,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const handleAuthentication = async () => {
     try {
-      console.log("Authenticating....");
+      // Check if Authentication is enabled
+      const secureStorage = SecureStorageService.getInstance;
+      const authEnabled = await authService.isBiometricEnabled();
+      setAuthEnabled(authEnabled);
+      if (!authEnabled) {
+        setIsAuthenticated(true);
+        setShowPasscodeModal(false);
+        return;
+      }
+
       const authenticated = await authService.authenticate();
       
       if (authenticated) {

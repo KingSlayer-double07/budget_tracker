@@ -66,7 +66,7 @@ export class AuthenticationService {
     }
   }
 
-  private async setPasscode(passcode: string): Promise<void> {
+  public async setPasscode(passcode: string): Promise<void> {
     try {
       await this.secureStorage.saveSecureItem(this.PASSCODE_KEY, passcode);
     } catch (error) {
@@ -75,10 +75,9 @@ export class AuthenticationService {
     }
   }
 
-  private async getPasscode(): Promise<string | null> {
+  public async getPasscode(): Promise<string | null> {
     try {
       const passcode = await this.secureStorage.getSecureItem(this.PASSCODE_KEY);
-      console.log("passcode: ", passcode);
       return passcode;
     } catch (error) {
       console.error('Error getting passcode:', error);
@@ -93,6 +92,15 @@ export class AuthenticationService {
     } catch (error) {
       console.error('Error checking passcode existence:', error);
       return false;
+    }
+  }
+
+  public async delPasscode(): Promise<void>{
+    try {
+      await this.secureStorage.deleteSecureItem(this.PASSCODE_KEY);
+      Alert.alert('Success', 'Password Reset');
+    } catch (error) {
+      console.error("Error Deleting Passcode", error);
     }
   }
 

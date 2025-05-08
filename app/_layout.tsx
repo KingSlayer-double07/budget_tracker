@@ -9,6 +9,7 @@ import { StyleSheet, View, ActivityIndicator, Text, TouchableOpacity, AppState, 
 import { NotificationService } from './services/NotificationService';
 //import { AuthenticationService } from './services/AuthenticationService';
 import { PasscodeModal } from './components/PasscodeModal';
+import { TransactionsProvider } from "./context/TransactionsContext";
 
 function AppContent() {
   const [isLoading, setIsLoading] = useState(true);
@@ -107,7 +108,7 @@ function AppContent() {
 
   return (
     <GestureHandlerRootView style={styles.container}>
-      {!isAuthenticated ? (
+      {!authenticated && !isAuthenticated ? (
         <View style={styles.authContainer}>
           <Text style={styles.authTitle}>Budget Tracker</Text>
           <Text style={styles.authMessage}>
@@ -119,6 +120,7 @@ function AppContent() {
         </View>
       ) : (
         <BudgetProvider>
+          <TransactionsProvider>
           <Stack
             screenOptions={{
               headerStyle: {
@@ -172,7 +174,15 @@ function AppContent() {
                 animation: 'simple_push',
               }}
             />
+            <Stack.Screen
+            name="statsScreen"
+            options={{
+              title: 'Statistics',
+              animation: 'slide_from_right',
+            }}
+            />
           </Stack>
+          </TransactionsProvider>
         </BudgetProvider>
       )}
       <PasscodeModal

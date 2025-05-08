@@ -97,9 +97,9 @@ export default function Index() {
         <TouchableOpacity style={styles.button} onPress={() => router.push('/addPurchaseScreen')}>
           <Text style={styles.buttonText}>Manage Purchases</Text>
         </TouchableOpacity>
-        {<TouchableOpacity style={[styles.button, styles.testButton]} onPress={testNotification}>
-          <Text style={styles.buttonText}>Test Notification</Text>
-        </TouchableOpacity>}
+        <TouchableOpacity style={[styles.button, styles.testButton]} onPress={() => router.push('/statsScreen')}>
+          <Text style={styles.buttonText}>View Stats</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );

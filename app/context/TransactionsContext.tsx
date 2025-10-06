@@ -1,4 +1,6 @@
 import React, { createContext, useState, useEffect } from 'react';
+import { getExpenses } from '../database';
+
 
 interface Transaction {
     amount: number;
@@ -16,13 +18,13 @@ export const TransactionsProvider:React.FC<{children: React.ReactNode}> = ({ chi
 
     useEffect(() => {
         // Fetch or load transactions from storage here
-        const savedTransactions: Transaction[] = [
-            { amount: 500, date: '2025-05-01' },
-            { amount: 1500, date: '2025-05-02' },
-            { amount: 200, date: '2025-05-03' },
-            // Add your actual transactions here
-        ];
-        setTransactions(savedTransactions);
+        const fetchTransactions = async () => {
+            const expenses = await getExpenses();
+            console.log('Fetched expenses:', expenses);
+            setTransactions(expenses as Transaction[]);
+            console.log('Set Transactions', transactions);
+        };
+        fetchTransactions();
     }, []);
 
     return (

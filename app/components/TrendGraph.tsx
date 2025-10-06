@@ -1,47 +1,53 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
-import { Polyline, Line, Circle, Svg } from 'react-native-svg';
+import React, { useState, useEffect } from "react"
+import { View, Text, TouchableOpacity } from "react-native"
+import { Polyline, Line, Circle, Svg, Text as SVGText } from "react-native-svg"
 
 export interface Transaction {
-    amount: number;
-    date: string;
+  amount: number
+  date: string
 }
 
 interface SpendingTrendsChartProps {
-    transactions: Transaction[];
+  transactions: Transaction[]
 }
 
 interface GroupedData {
-    name: string;
-    total: number;
+  name: string
+  total: number
 }
 
 const TrendGraph: React.FC<SpendingTrendsChartProps> = ({ transactions }) => {
-    const [timeframe, setTimeframe] = useState('weekly');
-    const [chartData, setChartData] = useState<GroupedData[]>([]);
+  const [timeframe, setTimeframe] = useState("weekly")
+  const [chartData, setChartData] = useState<GroupedData[]>([])
 
-    useEffect(() => {
-        const groupedData = groupDataByTimeframe(transactions, timeframe);
-        setChartData(groupedData);
-    }, [transactions, timeframe]);
+  useEffect(() => {
+    const groupedData = groupDataByTimeframe(transactions, timeframe)
+    setChartData(transactions.length ? groupedData : [])
+  }, [transactions, timeframe])
 
-
-    const groupDataByTimeframe = (transactions: Transaction[], timeframe: string): GroupedData[] => {
-        const dataMap: Record<string, number> = {};
-        transactions.forEach(({ amount, date }: Transaction) => {
-            const transactionDate = new Date(date);
-            let key: string;
-            if (timeframe === 'weekly') {
-                key = `Week ${Math.ceil(transactionDate.getDate() / 7)} - ${transactionDate.getMonth() + 1}`;
-            } else if (timeframe === 'monthly') {
-                key = `${transactionDate.getMonth() + 1}/${transactionDate.getFullYear()}`;
-            } else {
-                key = transactionDate.getFullYear().toString();
-            }
-            dataMap[key] = (dataMap[key] || 0) + amount;
-        });
-        return Object.entries(dataMap).map(([name, total]) => ({ name, total }));
-    };
+  const groupDataByTimeframe = (
+    transactions: Transaction[],
+    timeframe: string
+  ): GroupedData[] => {
+    const dataMap: Record<string, number> = {}
+    transactions.forEach(({ amount, date }: Transaction) => {
+      const transactionDate = new Date(date)
+      let key: string
+      if (timeframe === "weekly") {
+        key = `Week ${Math.ceil(transactionDate.getDate() / 7)} - ${
+          transactionDate.getMonth() + 1
+        }`
+      } else if (timeframe === "monthly") {
+        key = `${
+          transactionDate.getMonth() + 1
+        }/${transactionDate.getFullYear()}`
+      } else {
+        key = transactionDate.getFullYear().toString()
+      }
+      dataMap[key] = (dataMap[key] || 0) + amount
+    })
+    return Object.entries(dataMap).map(([name, total]) => ({ name, total }))
+  }
 
   const LineGraph: React.FC<{ chartData: GroupedData[] }> = ({ chartData }) => {
     // Add margins for labels
@@ -255,4 +261,4 @@ const TrendGraph: React.FC<SpendingTrendsChartProps> = ({ transactions }) => {
   )
 }
 
-export default TrendGraph;
+export default TrendGraph

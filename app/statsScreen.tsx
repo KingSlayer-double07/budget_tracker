@@ -27,7 +27,15 @@ export default function StatsScreen() {
 
     return (
         <ScrollView style={{ flex: 1, backgroundColor: '#f9f9f9', padding: 16 }}>
-            <TrendGraph transactions={transactions} />
+            {transactions.length === 0 ? (
+                <View style={{ alignItems: 'center', marginTop: 40 }}>
+                    <Text style={{ color: '#888', fontSize: 16 }}>
+                        No transactions to display.
+                    </Text>
+                </View>
+            ) : (
+                <TrendGraph transactions={transactions} />
+            )}
         </ScrollView>
     );
 };

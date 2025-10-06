@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react"
 import {
   getTotalIncome,
   getTotalExpenses,
@@ -13,44 +19,60 @@ import {
   deletePurchase,
   deleteIncome,
   deleteExpense,
-  handleRecurringUpdates
-} from '../database';
+  handleRecurringUpdates,
+} from "../database"
 
 interface BudgetContextType {
-  totalIncome: number;
-  totalExpenses: number;
-  balance: number;
-  incomeList: any[];
-  expenseList: any[];
-  plannedPurchases: any[];
-  isLoading: boolean;
-  error: string | null;
-  refreshData: () => Promise<void>;
-  addNewIncome: (source: string, amount: number, isRecurring: boolean, recurringDate: string) => Promise<boolean>;
-  addNewExpense: (item: string, amount: number, isRecurring: boolean, recurringDate: string) => Promise<boolean>;
-  addNewPlannedPurchase: (item: string, amount: number, dueDate?: string) => Promise<boolean>;
-  markAsBought: (id: number, amount: number, item: string) => Promise<boolean>;
-  deletePlannedPurchase: (id: number) => Promise<boolean>;
-  deleteSelectedIncome: (id: number) => Promise<boolean>;
-  deleteSelectedExpense: (id: number) => Promise<boolean>;
+  totalIncome: number
+  totalExpenses: number
+  balance: number
+  incomeList: any[]
+  expenseList: any[]
+  plannedPurchases: any[]
+  isLoading: boolean
+  error: string | null
+  refreshData: () => Promise<void>
+  addNewIncome: (
+    source: string,
+    amount: number,
+    isRecurring: boolean,
+    recurringDate: string
+  ) => Promise<boolean>
+  addNewExpense: (
+    item: string,
+    amount: number,
+    isRecurring: boolean,
+    recurringDate: string
+  ) => Promise<boolean>
+  addNewPlannedPurchase: (
+    item: string,
+    amount: number,
+    dueDate?: string
+  ) => Promise<boolean>
+  markAsBought: (id: number, amount: number, item: string) => Promise<boolean>
+  deletePlannedPurchase: (id: number) => Promise<boolean>
+  deleteSelectedIncome: (id: number) => Promise<boolean>
+  deleteSelectedExpense: (id: number) => Promise<boolean>
 }
 
-const BudgetContext = createContext<BudgetContextType | undefined>(undefined);
+const BudgetContext = createContext<BudgetContextType | undefined>(undefined)
 
-export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [totalIncome, setTotalIncome] = useState(0);
-  const [totalExpenses, setTotalExpenses] = useState(0);
-  const [balance, setBalance] = useState(0);
-  const [incomeList, setIncomeList] = useState<any[]>([]);
-  const [expenseList, setExpenseList] = useState<any[]>([]);
-  const [plannedPurchases, setPlannedPurchases] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  const [totalIncome, setTotalIncome] = useState(0)
+  const [totalExpenses, setTotalExpenses] = useState(0)
+  const [balance, setBalance] = useState(0)
+  const [incomeList, setIncomeList] = useState<any[]>([])
+  const [expenseList, setExpenseList] = useState<any[]>([])
+  const [plannedPurchases, setPlannedPurchases] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
     try {
-      setIsLoading(true);
-      setError(null);
+      setIsLoading(true)
+      setError(null)
 
       // Fetch all data in parallel
       const [
@@ -59,46 +81,46 @@ export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         planned,
         incomeTotal,
         expensesTotal,
-        currentBalance
+        currentBalance,
       ] = await Promise.all([
         getIncome(),
         getExpenses(),
         getPlannedPurchases(),
         getTotalIncome(),
         getTotalExpenses(),
-        getBalance()
-      ]);
+        getBalance(),
+      ])
 
-      setIncomeList(income);
-      setExpenseList(expenses);
-      setPlannedPurchases(planned);
-      setTotalIncome(incomeTotal);
-      setTotalExpenses(expensesTotal);
-      setBalance(currentBalance);
+      setIncomeList(income)
+      setExpenseList(expenses)
+      setPlannedPurchases(planned)
+      setTotalIncome(incomeTotal)
+      setTotalExpenses(expensesTotal)
+      setBalance(currentBalance)
     } catch (err) {
-      setError('Failed to fetch data. Please try again.');
-      console.error('Error fetching data:', err);
+      setError("Failed to fetch data. Please try again.")
+      console.error("Error fetching data:", err)
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  }, []);
+  }, [])
 
   // Initial data fetch
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchData()
+  }, [fetchData])
 
   // Set up recurring updates check
   useEffect(() => {
     const checkRecurringUpdates = async () => {
-      await handleRecurringUpdates();
-      await fetchData();
-    };
+      await handleRecurringUpdates()
+      await fetchData()
+    }
 
     // Check for recurring updates every hour
-    const interval = setInterval(checkRecurringUpdates, 60 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [fetchData]);
+    const interval = setInterval(checkRecurringUpdates, 60 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [fetchData])
 
   const addNewIncome = async (
     source: string,
@@ -106,12 +128,12 @@ export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     isRecurring: boolean,
     recurringDate: string
   ): Promise<boolean> => {
-    const success = await addIncome(source, amount, isRecurring, recurringDate);
+    const success = await addIncome(source, amount, isRecurring, recurringDate)
     if (success) {
-      await fetchData();
+      await fetchData()
     }
-    return success;
-  };
+    return success
+  }
 
   const addNewExpense = async (
     item: string,
@@ -119,58 +141,66 @@ export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     isRecurring: boolean,
     recurringDate: string
   ): Promise<boolean> => {
-    const success = await addExpense(item, amount, isRecurring, recurringDate);
+    const success = await addExpense(item, amount, isRecurring, recurringDate)
     if (success) {
-      await fetchData();
+      await fetchData()
     }
-    return success;
-  };
+    return success
+  }
 
-  const addNewPlannedPurchase = async (item: string, amount: number, dueDate?: string): Promise<boolean> => {
-    const success = await addPlannedPurchase(item, amount, dueDate);
+  const addNewPlannedPurchase = async (
+    item: string,
+    amount: number,
+    dueDate?: string
+  ): Promise<boolean> => {
+    const success = await addPlannedPurchase(item, amount, dueDate)
     if (success) {
-      await fetchData();
+      await fetchData()
     }
-    return success;
-  };
+    return success
+  }
 
-  const markAsBought = async (id: number, amount: number, item: string): Promise<boolean> => {
-    const success = await markPurchaseAsBought(id, amount, item);
+  const markAsBought = async (
+    id: number,
+    amount: number,
+    item: string
+  ): Promise<boolean> => {
+    const success = await markPurchaseAsBought(id, amount, item)
     if (success) {
-      await fetchData();
+      await fetchData()
     }
-    return success;
-  };
+    return success
+  }
 
   const deletePlannedPurchase = async (id: number): Promise<boolean> => {
-    const success = await deletePurchase(id);
+    const success = await deletePurchase(id)
     if (success) {
-      await fetchData();
+      await fetchData()
     } else {
-      setError('Failed to delete planned purchase');
+      setError("Failed to delete planned purchase")
     }
-    return success;
-  };
+    return success
+  }
 
   const deleteSelectedIncome = async (id: number): Promise<boolean> => {
-    const success = await deleteIncome(id);
+    const success = await deleteIncome(id)
     if (success) {
-      await fetchData();
+      await fetchData()
     } else {
-      setError('Failed to delete income');
+      setError("Failed to delete income")
     }
-    return success;
-  };
+    return success
+  }
 
   const deleteSelectedExpense = async (id: number): Promise<boolean> => {
-    const success = await deleteExpense(id);
+    const success = await deleteExpense(id)
     if (success) {
-      await fetchData();
+      await fetchData()
     } else {
-      setError('Failed to delete expense');
+      setError("Failed to delete expense")
     }
-    return success;
-  };
+    return success
+  }
 
   return (
     <BudgetContext.Provider
@@ -190,18 +220,17 @@ export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         markAsBought,
         deletePlannedPurchase,
         deleteSelectedIncome,
-        deleteSelectedExpense
-      }}
-    >
+        deleteSelectedExpense,
+      }}>
       {children}
     </BudgetContext.Provider>
-  );
-};
+  )
+}
 
 export const useBudget = () => {
-  const context = useContext(BudgetContext);
+  const context = useContext(BudgetContext)
   if (context === undefined) {
-    throw new Error('useBudget must be used within a BudgetProvider');
+    throw new Error("useBudget must be used within a BudgetProvider")
   }
-  return context;
-}; 
+  return context
+}

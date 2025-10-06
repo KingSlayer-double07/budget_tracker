@@ -75,7 +75,12 @@ const TrendGraph: React.FC<SpendingTrendsChartProps> = ({ transactions }) => {
 
     if (chartData.length === 1) {
       return (
-        <View style={{ alignItems: "center", height: 300, justifyContent: "center" }}>
+        <View
+          style={{
+            alignItems: "center",
+            height: 300,
+            justifyContent: "center",
+          }}>
           <Svg
             width={svgWidth}
             height={svgHeight}
@@ -109,7 +114,7 @@ const TrendGraph: React.FC<SpendingTrendsChartProps> = ({ transactions }) => {
     const points = chartData
       .map((data, index) => {
         const x = marginLeft + (index / (chartData.length - 1)) * graphWidth
-        const y = ((data.total - minTotal) / (maxTotal - minTotal || 1))
+        const y = (data.total - minTotal) / (maxTotal - minTotal || 1)
         const yPos = graphHeight - y * graphHeight
         return `${x},${yPos}`
       })
@@ -166,7 +171,7 @@ const TrendGraph: React.FC<SpendingTrendsChartProps> = ({ transactions }) => {
           />
           {chartData.map((data: GroupedData, index: number) => {
             const x = marginLeft + (index / (chartData.length - 1)) * graphWidth
-            const y = ((data.total - minTotal) / (maxTotal - minTotal || 1))
+            const y = (data.total - minTotal) / (maxTotal - minTotal || 1)
             const yPos = graphHeight - y * graphHeight
             return (
               <Circle

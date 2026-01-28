@@ -1,43 +1,93 @@
-# Welcome to my Budget Tracking mobile app 👋
+# Budget Tracker
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A robust and privacy-centric mobile application designed to empower users with full control over their personal finances. Built with **TypeScript** and **React Native**, this project focuses on local-first data integrity, automated recurring transaction management, and high-level security.
 
-## Installation
-1. Clone the repo:`git clone https://github.com/KingSlayer-double07/budget_tracker.git`
-2. Install dependencies: `npm install`
-3. Start the app: `npx expo start`
+## Overview
+Budget Tracker is more than just a ledger; it is a financial companion that helps users plan future purchases, monitor spending trends, and stay within their means through intelligent budget threshold alerts. By leveraging **SQLite** for local storage, all sensitive financial data remains strictly on the device, ensuring maximum privacy.
 
-In the output, you'll find options to open the app in a
+## Key Features
+*   **Transaction Lifecycle Management**: Seamlessly add, delete, and categorize income and expenses.
+*   **Recurring Automation**: Intelligent logic to automatically handle monthly income and expenses based on user-defined dates.
+*   **Planned Purchases & Reminders**: A dedicated system to track future acquisitions with swipe-to-buy functionality that automatically converts plans into expense entries.
+*   **Security Suite**: Dual-layer protection featuring biometric authentication (FaceID/Fingerprint) and a secure 4-digit passcode fallback.
+*   **Visual Analytics**: Real-time spending trend graphs to help identify financial patterns over weekly, monthly, or all-time scales.
+*   **Smart Notifications**: Automated alerts for recurring transaction due dates and budget threshold warnings.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Technologies Used
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+| Technology | Purpose |
+| :--- | :--- |
+| **React Native** | Cross-platform mobile framework |
+| **Expo** | Development platform and SDK |
+| **TypeScript** | Type-safe application logic |
+| **SQLite** | Local relational database management |
+| **Expo SecureStore** | Encrypted storage for authentication data |
+| **Victory Native** | Data visualization and charting |
+| **Expo Notifications** | Local push notification management |
 
-## Features
-- Add income and expenses
-- Set monthly income and expenses
-- Add, delete planned purchases which can be marked as bought whenever
-- Automatically add bought purchases to expenses
-- View total income, total expenses and available balance
+## Getting Started
+
+### Prerequisites
+*   Node.js (LTS version recommended)
+*   npm or yarn
+*   Expo Go app on your mobile device or an emulator (Android Studio / Xcode)
+
+### Installation
+1.  **Clone the Repository**:
+    ```bash
+    git clone https://github.com/KingSlayer-double07/budget_tracker.git
+    cd budget_tracker
+    ```
+
+2.  **Install Dependencies**:
+    ```bash
+    npm install
+    ```
+
+3.  **Start the Development Server**:
+    ```bash
+    npx expo start
+    ```
+
+4.  **Launch the App**:
+    *   Scan the QR code with your phone (using Expo Go).
+    *   Press `a` for Android emulator or `i` for iOS simulator.
+
+## Usage Guide
+
+### Dashboard
+The main screen provides a high-level summary of your financial health, displaying Total Income, Total Expenses, and your current Net Balance. From here, you can quickly navigate to specific management modules.
+
+### Managing Finances
+*   **Income/Expenses**: Enter the source/item name and amount. Toggle the "Recurring" switch to set a specific day of the month for automated logging.
+*   **Planned Purchases**: Track items you intend to buy. When you finally make the purchase, swipe the item in the list to "Mark as Bought," which automatically logs it as an expense and updates your balance.
+
+### Security & Settings
+Navigate to the Settings gear on the dashboard to:
+*   Enable/Disable Biometric Security.
+*   Configure a 4-digit Passcode.
+*   Set a **Budget Threshold**. The app will notify you once your total monthly expenses reach this specified limit.
 
 ## Contributing
-1. Fork the repository
-2. Create a new branch
-3. Submit a pull request
+Contributions make the open-source community an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
 
-## Learn more
+*   Fork the Project.
+*   Create your Feature Branch (`git checkout -b feature/AmazingFeature`).
+*   Commit your Changes (`git commit -m 'Add some AmazingFeature'`).
+*   Push to the Branch (`git push origin feature/AmazingFeature`).
+*   Open a Pull Request.
 
-To learn more about developing Expo projects, look at the following resources:
+## Author
+**[Your Name/Username]**
+*   **GitHub**: [KingSlayer-double07](https://github.com/KingSlayer-double07)
+*   **LinkedIn**: [Your LinkedIn Profile]
+*   **Twitter/X**: [Your Twitter Handle]
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+---
 
-## Join the community
+![React Native](https://img.shields.io/badge/React_Native-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![Expo](https://img.shields.io/badge/expo-1C1E24?style=for-the-badge&logo=expo&logoColor=D04A37)
+![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white)
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+[![Readme was generated by Dokugen](https://img.shields.io/badge/Readme%20was%20generated%20by-Dokugen-brightgreen)](https://www.npmjs.com/package/dokugen)

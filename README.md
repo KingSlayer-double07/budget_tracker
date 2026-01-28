@@ -78,10 +78,13 @@ Contributions make the open-source community an amazing place to learn, inspire,
 *   Open a Pull Request.
 
 ## Author
-**[Your Name/Username]**
+**[Favour Akande/KingSlayer]**
+Software Engineer & Mobile App Developer
+
 *   **GitHub**: [KingSlayer-double07](https://github.com/KingSlayer-double07)
-*   **LinkedIn**: [Your LinkedIn Profile]
-*   **Twitter/X**: [Your Twitter Handle]
+*   **LinkedIn**: [favourakande](https://www.linkedin.com/in/favourakande/)
+*   **Twitter/X**: [favourdslayer](https://x.com/favourdslayer)
+*   **Email**: favourakande1@gmail.com
 
 ---
 

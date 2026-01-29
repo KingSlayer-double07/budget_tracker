@@ -418,6 +418,55 @@ export const markPurchaseAsBought = async (
   )
 }
 
+export const changePurchaseAmount = async (
+  id: number,
+  amount: number,
+  newAmount: number,
+  item: string
+): Promise<boolean> => {
+  return (
+    (await safeDatabaseOperation(async (db) => {
+      const result = await getSpecificPurchase(id);
+
+      if (!result) {
+        Alert.alert("Error", "Purchase not found")
+        console.log(`No Purchase found for id ${id} and item ${item}`)
+        return false
+      }
+
+      if (result.purchased) {
+        Alert.alert(
+          "Already Bought",
+          "This item has already been marked as bought. \n Its amount can no longer be edited"
+        )
+        console.log(`The item ${item} has already been marked as bought`)
+        return false
+      }
+
+      // Start transaction
+      await db.execAsync("BEGIN TRANSACTION")
+
+      try {
+        // Edit purchase amount
+        await db.runAsync(
+          `UPDATE planned_purchases SET amount = ? WHERE id = ?;`,
+          [newAmount, id]
+        )
+
+        await db.execAsync("COMMIT")
+        console.log(
+        `Planned purchase edited: ${result.item} ; previous amount - ${amount}  new amount - ${result.amount}`)
+        Alert.alert("Success", "Purchase amount has been successfully edited!")
+        return true
+      } catch (error) {
+        console.log(error)
+        await db.execAsync("ROLLBACK")
+        throw error
+      }
+    })) || false
+  )
+}
+
 export const getTotalIncome = async (): Promise<number> => {
   return (
     (await safeDatabaseOperation(async (db) => {

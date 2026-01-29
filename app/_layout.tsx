@@ -181,7 +181,7 @@ function AppContent() {
               <Stack.Screen
                 name="addPurchaseScreen"
                 options={{
-                  title: "Add Purchase",
+                  title: "Add Planned Purchase",
                   animation: "slide_from_right",
                 }}
               />

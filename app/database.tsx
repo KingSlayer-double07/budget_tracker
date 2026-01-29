@@ -316,6 +316,18 @@ export const getPlannedPurchases = async () => {
   )
 }
 
+export const getSpecificPurchase = async (id: number) => {
+  return (
+    (await safeDatabaseOperation(async (db) => {
+      const result = await db.getFirstAsync<PlannedPurchase>(
+        "SELECT * FROM planned_purchases WHERE id = ?",
+        [id]
+      )
+      return result
+    }))
+  )
+}
+
 export const getIncome = async () => {
   return (
     (await safeDatabaseOperation(async (db) => {

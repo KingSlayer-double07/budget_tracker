@@ -193,6 +193,13 @@ function AppContent() {
                 }}
               />
               <Stack.Screen
+               name="editPurchaseScreen"
+               options={{
+                title: "Edit Planned Purchase",
+                animation: "slide_from_left"
+               }}
+               />
+              <Stack.Screen
                 name="settingsScreen"
                 options={{
                   title: "Settings",

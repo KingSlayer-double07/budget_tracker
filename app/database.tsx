@@ -455,7 +455,7 @@ export const changePurchaseAmount = async (
 
         await db.execAsync("COMMIT")
         console.log(
-        `Planned purchase edited: ${result.item} ; previous amount - ${amount}  new amount - ${result.amount}`)
+        `Planned purchase edited: ${result.item} ; previous amount - ${result.amount}  new amount - ${newAmount}`)
         Alert.alert("Success", "Purchase amount has been successfully edited!")
         return true
       } catch (error) {

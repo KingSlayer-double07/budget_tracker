@@ -737,7 +737,7 @@ export const clearExpensesTable = async (): Promise<boolean> => {
 export const clearPlannedPurchasesTable = async (): Promise<boolean> => {
   return (
     (await safeDatabaseOperation(async (db) => {
-      await db.runAsync("DELETE FROM planned_purchases;")
+      await db.runAsync("DELETE FROM planned_purchases WHERE purchased = 0;")
       return true
     })) || false
   )

@@ -25,6 +25,7 @@
         "backgroundColor": "#043927"
       },
       "package": "com.kingslayer_double07.budget_tracker",
+      "permissions": [],
       "useNextNotificationsApi": true,
       "minSdkVersion": 21,
       "targetSdkVersion": 34

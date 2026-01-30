@@ -16,6 +16,7 @@ import {
   addExpense,
   addPlannedPurchase,
   markPurchaseAsBought,
+  changePurchaseAmount,
   deletePurchase,
   deleteIncome,
   deleteExpense,
@@ -50,6 +51,7 @@ interface BudgetContextType {
     dueDate?: string
   ) => Promise<boolean>
   markAsBought: (id: number, amount: number, item: string) => Promise<boolean>
+  editPlannedPurchaseAmount: (id: number, amount: number, newAmount: number, item: string) => Promise<boolean>
   deletePlannedPurchase: (id: number) => Promise<boolean>
   deleteSelectedIncome: (id: number) => Promise<boolean>
   deleteSelectedExpense: (id: number) => Promise<boolean>
@@ -172,6 +174,19 @@ export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({
     return success
   }
 
+  const editPlannedPurchaseAmount = async (
+    id: number,
+    amount: number,
+    newAmount: number,
+    item: string
+  ): Promise<boolean> => {
+    const success = await changePurchaseAmount(id, amount, newAmount, item)
+    if (success) {
+      await fetchData()
+    }
+    return success
+  }
+
   const deletePlannedPurchase = async (id: number): Promise<boolean> => {
     const success = await deletePurchase(id)
     if (success) {
@@ -218,6 +233,7 @@ export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({
         addNewExpense,
         addNewPlannedPurchase,
         markAsBought,
+        editPlannedPurchaseAmount,
         deletePlannedPurchase,
         deleteSelectedIncome,
         deleteSelectedExpense,

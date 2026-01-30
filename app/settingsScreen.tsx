@@ -235,7 +235,7 @@ export default function SettingsScreen() {
               value={newPasscode}
               onChangeText={setNewPasscode}
               keyboardType="numeric"
-              placeholder={newPasscode}
+              placeholder={""}
             />
           </View>
           <TouchableOpacity

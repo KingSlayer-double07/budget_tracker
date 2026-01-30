@@ -12,13 +12,17 @@ import {
 import { useBudget } from "./context/BudgetContext"
 import { Swipeable } from "react-native-gesture-handler"
 import { clearPlannedPurchasesTable } from "./database"
+import InputModal from "./components/InputModal"
 
 export default function PlannedPurchasesScreen() {
+  const [selectedPurchase, setSelectedPurchase] = useState(null)
+  const [showInputModal, setShowInputModal] = useState(false)
   const {
     plannedPurchases,
     isLoading,
     error,
     markAsBought,
+    editPlannedPurchaseAmount,
     deletePlannedPurchase,
     refreshData,
   } = useBudget()
@@ -101,6 +105,42 @@ export default function PlannedPurchasesScreen() {
     )
   }
 
+  const handleEditPurchaseAmount = async (
+    id: number,
+    amount: number,
+    newAmount: number,
+    item: string
+  ) => {
+    
+
+    if (!newAmount) {
+      Alert.alert("Error", "Please enter a new amount")
+      return
+    }
+
+    //const numericNewAmount = parseFloat(newAmount)
+    if (isNaN(newAmount) || newAmount <= 0) {
+      Alert.alert("Error", "Please enter a valid amount.")
+      return
+    }
+
+    try {
+      const success = await editPlannedPurchaseAmount(id, amount, newAmount, item)
+      if (success) {
+        Alert.alert("Success", "Purchase successfully edited!")
+        setShowInputModal(false)
+      }
+      else {
+        Alert.alert(
+          "Error",
+          "Failed to edit purchase amount. Please try again."
+        )
+      }
+    } catch (error) {
+      Alert.alert("Error", "An unexpected error occurred. Please try again")
+    }
+  }
+
   const renderLeftActions = (item: any) => {
     if (item.purchased) return null // Don't show swipe actions for purchased items
 
@@ -123,6 +163,15 @@ export default function PlannedPurchasesScreen() {
     )
   }
 
+  const renderPressAction = (item: any) => {
+    setSelectedPurchase(item)
+    if (item.purchased) {
+      Alert.alert("Error", "Purchase already marked as bought. Amount can no longer be edited")
+    } else {
+      setShowInputModal(true)
+    }
+  }
+
   const renderItem = ({ item }: { item: any }) => (
     <Swipeable
       renderRightActions={() => renderRightActions(item)}
@@ -134,9 +183,11 @@ export default function PlannedPurchasesScreen() {
       <View style={[styles.purchase, item.purchased && styles.purchasedItem]}>
         <View style={styles.purchaseContent}>
           <Text style={styles.purchaseName}>{item.item}</Text>
-          <Text style={styles.purchaseAmount}>
-            NGN{item.amount.toLocaleString()}
-          </Text>
+          <TouchableOpacity onPress={() => renderPressAction(item)}>
+            <Text style={styles.purchaseAmount}>
+              NGN{item.amount.toLocaleString()}
+            </Text>
+          </TouchableOpacity>
         </View>
         <View style={styles.purchaseInfo}>
           <Text style={styles.purchaseStatus}>

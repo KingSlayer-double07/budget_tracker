@@ -198,6 +198,22 @@ export default function PlannedPurchasesScreen() {
           contentContainerStyle={styles.listContainer}
         />
       )}
+
+      <InputModal
+        visible={showInputModal}
+        title="Enter New Amount"
+        message={`Enter the new amount to be used`}
+        amount={selectedPurchase?.amount}
+        onConfirm={(newAmount: number) => {handleEditPurchaseAmount(
+          selectedPurchase.id, 
+          selectedPurchase.amount,
+          newAmount,
+          selectedPurchase.item
+        )}}
+        onCancel={() => {
+          setShowInputModal(false)
+        }}
+      />
     </View>
   )
 }

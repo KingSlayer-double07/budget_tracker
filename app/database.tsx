@@ -691,30 +691,6 @@ export const handleRecurringUpdates = async () => {
   }
 }
 
-export const resetDatabase = async () => {
-  try {
-    const dbPath = `${FileSystem.documentDirectory}SQLite/budgetTracker.db`
-
-    // Confirm before deleting
-    Alert.alert(
-      "Reset Database",
-      "Are you sure you want to reset all data? This action cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Yes, Reset",
-          onPress: async () => {
-            await FileSystem.deleteAsync(dbPath)
-            Alert.alert("Success", "Database has been reset. Restart the app.")
-          },
-        },
-      ]
-    )
-  } catch (error) {
-    Alert.alert("Error", "Something went wrong while resetting the database.")
-    console.error(error)
-  }
-}
 
 export const clearIncomeTable = async (): Promise<boolean> => {
   return (

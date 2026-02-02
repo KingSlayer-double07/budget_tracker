@@ -15,6 +15,7 @@ import { NotificationService } from "./services/NotificationService"
 import { useBudget } from "./context/BudgetContext"
 import { clearAllData } from "./database"
 import { PasscodeModal } from "./components/PasscodeModal"
+import { useAuth } from "./context/AuthContext"
 
 export default function SettingsScreen() {
   const [biometricEnabled, setBiometricEnabled] = useState(false)
@@ -24,11 +25,39 @@ export default function SettingsScreen() {
   const [newPasscode, setNewPasscode] = useState("")
   const { totalIncome, refreshData } = useBudget()
   const authService = AuthenticationService.getInstance()
+  const [authenticated, setAuthenticated] = useState(false)
+  const [isWrongPasscode, setIsWrongPasscode] = useState(false)
+  const {
+    handlePasscodeSubmit,
+    isNewPasscode,
+    isAuthenticated,
+    showPasscodeModal,
+    setShowPasscodeModal,
+    handleAuthentication,
+    authError
+  } = useAuth()
 
   useEffect(() => {
-    loadSettings()
+    initializeScreen()
   }, [])
 
+  const initializeScreen = async () => {
+    try {
+      // Set Authentication
+      setAuthenticated(isAuthenticated)
+
+      // Authenticate User
+      await handleAuthentication()
+      
+      // Load Settings
+      await loadSettings()
+      
+    } catch (error) {
+      Alert.alert("Error", "Error Loading Screen")
+      console.error("Error Loading Screen:", error)
+    }
+  }
+  
   const loadSettings = async () => {
     try {
       const secureStorage = SecureStorageService.getInstance()
@@ -69,6 +98,11 @@ export default function SettingsScreen() {
     }
   }
 
+  const submitPasscode = async (passcode: string) => {
+    const success = await handlePasscodeSubmit(passcode)
+    setIsWrongPasscode(!success)
+  }
+  
   const toggleBiometric = async () => {
     try {
       const secureStorage = SecureStorageService.getInstance()
@@ -190,7 +224,21 @@ export default function SettingsScreen() {
     <ScrollView style={styles.container}>
       <Text style={styles.heading}>Settings</Text>
 
-      <View style={styles.section}>
+      {!authenticated && !isAuthenticated ? (
+              <View style={styles.authContainer}>
+                <Text style={styles.authTitle}>Budget Tracker</Text>
+                <Text style={styles.authMessage}>
+                  {authError || "Please authenticate to access your budget data"}
+                </Text>
+                <TouchableOpacity
+                  style={styles.authButton}
+                  onPress={handleAuthentication}>
+                  <Text style={styles.authButtonText}>Authenticate</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+            <View>
+            <View style={styles.section}>
         <Text style={styles.sectionTitle}>Security</Text>
         <View style={styles.setting}>
           <Text style={styles.settingLabel}>Budget Security</Text>
@@ -254,6 +302,7 @@ export default function SettingsScreen() {
           onPress={handleClearDatabase}>
           <Text style={styles.buttonText}>Clear All Data</Text>
         </TouchableOpacity>
+      </View>
       </View>
       )}
       <PasscodeModal

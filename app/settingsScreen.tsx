@@ -14,6 +14,7 @@ import { SecureStorageService } from "./services/SecureStorageService"
 import { NotificationService } from "./services/NotificationService"
 import { useBudget } from "./context/BudgetContext"
 import { clearAllData } from "./database"
+import { PasscodeModal } from "./components/PasscodeModal"
 
 export default function SettingsScreen() {
   const [biometricEnabled, setBiometricEnabled] = useState(false)
@@ -254,6 +255,19 @@ export default function SettingsScreen() {
           <Text style={styles.buttonText}>Clear All Data</Text>
         </TouchableOpacity>
       </View>
+      )}
+      <PasscodeModal
+        visible={showPasscodeModal}
+        isNewPasscode={isNewPasscode}
+        isWrongPasscode={isWrongPasscode}
+        onCancel={() => {
+          setAuthenticated(false)
+          setShowPasscodeModal(false)
+        }}
+        onSubmit={submitPasscode}
+        onInputChange={() => setIsWrongPasscode(false)}
+      />
+      
     </ScrollView>
   )
 }

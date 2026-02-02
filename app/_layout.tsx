@@ -238,6 +238,10 @@ export default function RootLayout() {
   )
 }
 
+export const unstable_settings = {
+  web: false,
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,

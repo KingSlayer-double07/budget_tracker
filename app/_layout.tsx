@@ -87,10 +87,10 @@ function AppContent() {
             const { actionIdentifier, notification } = response
             const { data } = notification.request.content
 
-            if (actionIdentifier === "CANCEL_FUTURE" && data?.identifier) {
+            if (actionIdentifier === "CANCEL_FUTURE" && typeof data?.identifier === 'string') {
               try {
                 await notificationService.cancelFutureOccurrences(
-                  data.selected,
+                  data.selected as string,
                   data.identifier
                 )
                 console.log(

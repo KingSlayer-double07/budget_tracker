@@ -245,7 +245,7 @@ export default function SettingsScreen() {
           <Switch
             value={biometricEnabled}
             onValueChange={toggleBiometric}
-            //disabled={!biometricAvailable}
+          //disabled={!biometricAvailable}
           />
         </View>
         {!biometricEnabled && (

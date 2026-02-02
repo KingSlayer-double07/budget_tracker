@@ -282,9 +282,11 @@ export default function SettingsScreen() {
             <TextInput
               style={styles.input}
               value={newPasscode}
+              secureTextEntry
+              maxLength={4}
               onChangeText={setNewPasscode}
               keyboardType="numeric"
-              placeholder={""}
+              placeholder={"****"}
             />
           </View>
           <TouchableOpacity

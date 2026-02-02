@@ -284,6 +284,36 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     color: "#043927",
   },
+  authContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f4f4f4",
+    padding: 20,
+  },
+  authTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#043927",
+    marginBottom: 20,
+  },
+  authMessage: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    marginBottom: 30,
+  },
+  authButton: {
+    backgroundColor: "#043927",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  authButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
   section: {
     backgroundColor: "white",
     borderRadius: 10,

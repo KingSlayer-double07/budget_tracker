@@ -22,14 +22,6 @@
       }
     }
   },
-  "update": {
-    "production": {
-      "platforms": [
-        "ios",
-        "android"
-      ]
-    }
-  },
   "submit": {
     "production": {}
   }

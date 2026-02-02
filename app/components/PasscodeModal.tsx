@@ -63,12 +63,6 @@ export const PasscodeModal: React.FC<PasscodeModalProps> = ({
             placeholder="Enter 4-digit passcode"
           />
           <View style={styles.buttonContainer}>
-            {/*<TouchableOpacity
-              style={styles.button}
-              onPress={onCancel}
-            >
-              <Text style={styles.buttonText}>Cancel</Text>
-            </TouchableOpacity>*/}
             <TouchableOpacity
               style={styles.button}
               onPress={handleSubmit}>

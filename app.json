@@ -30,11 +30,6 @@
       "minSdkVersion": 21,
       "targetSdkVersion": 34
     },
-    "web": {
-      "bundler": "metro",
-      "output": "static",
-      "favicon": "./assets/images/icon.png"
-    },
     "plugins": [
       "expo-router",
       [

@@ -11,27 +11,34 @@ import {
 interface PasscodeModalProps {
   visible: boolean
   isNewPasscode: boolean
+  isWrongPasscode?: boolean
   onCancel: () => void
   onSubmit: (passcode: string) => void
+  onInputChange?: () => void
 }
 
 export const PasscodeModal: React.FC<PasscodeModalProps> = ({
   visible,
   isNewPasscode,
+  isWrongPasscode,
   onCancel,
   onSubmit,
+  onInputChange,
 }) => {
   const [passcode, setPasscode] = useState("")
-  const [isWrong, setIsWrong] = useState(false)
 
-  const handleSubmit = () => {
-    if (passcode.length !== 4 || !/^\d+$/.test(passcode)) {
-      return
-    }
-    onSubmit(passcode)
+  const handleSubmit = async (submittedPasscode?: string) => {
+    const passcodeToSubmit = submittedPasscode ?? passcode
+    onSubmit(passcodeToSubmit)
     setPasscode("")
-    setIsWrong(true)
   }
+
+  // Reset input when the modal visibility changes
+  React.useEffect(() => {
+    if (visible === false) {
+      setPasscode("")
+    }
+  }, [visible])
 
   return (
     <Modal
@@ -43,7 +50,7 @@ export const PasscodeModal: React.FC<PasscodeModalProps> = ({
           <Text style={styles.title}>
             {isNewPasscode ? "Set Passcode" : "Enter Passcode"}
           </Text>
-          {isWrong && (
+          {isWrongPasscode && (
             <Text style={styles.wrong}>
               You entered a wrong passcode. Give it another try
             </Text>
@@ -55,9 +62,10 @@ export const PasscodeModal: React.FC<PasscodeModalProps> = ({
             maxLength={4}
             value={passcode}
             onChangeText={(text) => {
+              if (onInputChange) onInputChange()
               setPasscode(text)
               if (text.length === 4) {
-                handleSubmit()
+                handleSubmit(text)
               }
             }}
             placeholder="Enter 4-digit passcode"
@@ -65,7 +73,7 @@ export const PasscodeModal: React.FC<PasscodeModalProps> = ({
           <View style={styles.buttonContainer}>
             <TouchableOpacity
               style={styles.button}
-              onPress={handleSubmit}>
+              onPress={() => handleSubmit()}>
               <Text style={styles.buttonText}>OK</Text>
             </TouchableOpacity>
           </View>

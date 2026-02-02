@@ -8,7 +8,7 @@ interface AuthContextType {
   showPasscodeModal: boolean
   isNewPasscode: boolean
   handleAuthentication: () => Promise<void>
-  handlePasscodeSubmit: (passcode: string) => Promise<void>
+  handlePasscodeSubmit: (passcode: string) => Promise<boolean>
   setShowPasscodeModal: (visible: boolean) => void
 }
 
@@ -24,18 +24,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [authEnabled, setAuthEnabled] = useState(false)
   const authService = AuthenticationService.getInstance()
 
-  const handlePasscodeSubmit = async (passcode: string) => {
+  const handlePasscodeSubmit = async (passcode: string): Promise<boolean> => {
     try {
       const success = await authService.authenticateWithPasscode(passcode)
       if (success) {
         setShowPasscodeModal(false)
         setIsAuthenticated(true)
+        return true
       } else {
         setAuthError("Incorrect passcode. Please try again.")
+        return false
       }
     } catch (error) {
       console.error("Error during passcode authentication:", error)
       setAuthError("Authentication failed. Please try again.")
+      return false
     }
   }
 

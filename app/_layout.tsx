@@ -25,6 +25,7 @@ import { TransactionsProvider } from "./context/TransactionsContext"
 
 function AppContent() {
   const [isLoading, setIsLoading] = useState(true)
+  const [isWrongPasscode, setIsWrongPasscode] = useState(false)
   const {
     isAuthenticated,
     authError,
@@ -117,6 +118,11 @@ function AppContent() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const submitPasscode = async (passcode: string) => {
+    const success = await handlePasscodeSubmit(passcode)
+    setIsWrongPasscode(!success)
   }
 
   if (isLoading) {
@@ -213,10 +219,12 @@ function AppContent() {
       <PasscodeModal
         visible={showPasscodeModal}
         isNewPasscode={isNewPasscode}
+        isWrongPasscode={ isWrongPasscode}
         onCancel={() => {
           setAuthenticated(false), setShowPasscodeModal(false)
         }}
-        onSubmit={handlePasscodeSubmit}
+        onSubmit={submitPasscode}
+        onInputChange={() => setIsWrongPasscode(false)}
       />
     </GestureHandlerRootView>
   )

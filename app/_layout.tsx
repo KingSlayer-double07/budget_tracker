@@ -219,7 +219,7 @@ function AppContent() {
       <PasscodeModal
         visible={showPasscodeModal}
         isNewPasscode={isNewPasscode}
-        isWrongPasscode={ isWrongPasscode}
+        isWrongPasscode={isWrongPasscode}
         onCancel={() => {
           setAuthenticated(false), setShowPasscodeModal(false)
         }}

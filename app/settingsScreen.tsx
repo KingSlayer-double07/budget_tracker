@@ -48,16 +48,16 @@ export default function SettingsScreen() {
 
       // Authenticate User
       await handleAuthentication()
-      
+
       // Load Settings
       await loadSettings()
-      
+
     } catch (error) {
       Alert.alert("Error", "Error Loading Screen")
       console.error("Error Loading Screen:", error)
     }
   }
-  
+
   const loadSettings = async () => {
     try {
       const secureStorage = SecureStorageService.getInstance()
@@ -102,7 +102,7 @@ export default function SettingsScreen() {
     const success = await handlePasscodeSubmit(passcode)
     setIsWrongPasscode(!success)
   }
-  
+
   const toggleBiometric = async () => {
     try {
       const secureStorage = SecureStorageService.getInstance()
@@ -225,87 +225,87 @@ export default function SettingsScreen() {
       <Text style={styles.heading}>Settings</Text>
 
       {!authenticated && !isAuthenticated ? (
-              <View style={styles.authContainer}>
-                <Text style={styles.authTitle}>Budget Tracker</Text>
-                <Text style={styles.authMessage}>
-                  {authError || "Please authenticate to access your budget data"}
-                </Text>
-                <TouchableOpacity
-                  style={styles.authButton}
-                  onPress={handleAuthentication}>
-                  <Text style={styles.authButtonText}>Authenticate</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-            <View>
-            <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Security</Text>
-        <View style={styles.setting}>
-          <Text style={styles.settingLabel}>Budget Security</Text>
-          <Switch
-            value={biometricEnabled}
-            onValueChange={toggleBiometric}
-          //disabled={!biometricAvailable}
-          />
-        </View>
-        {!biometricEnabled && (
-          <Text style={styles.warning}>Authentication is not enabled.</Text>
-        )}
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Budget Alerts</Text>
-        <View style={styles.setting}>
-          <Text style={styles.settingLabel}>Budget Threshold (NGN)</Text>
-          <TextInput
-            style={styles.input}
-            value={budgetThreshold}
-            onChangeText={setBudgetThreshold}
-            keyboardType="numeric"
-            placeholder="Enter threshold amount"
-          />
-        </View>
-        <TouchableOpacity
-          style={styles.button}
-          onPress={updateBudgetThreshold}>
-          <Text style={styles.buttonText}>Update Threshold</Text>
-        </TouchableOpacity>
-      </View>
-
-      {hasPasscode && biometricEnabled && (
-        <View style={styles.section}>
-          <TouchableOpacity onPress={handleDelete}>
-            <Text style={styles.sectionTitle}>Reset Passcode</Text>
-          </TouchableOpacity>
-          <View style={styles.setting}>
-            <Text style={styles.settingLabel}>Input new passcode</Text>
-            <TextInput
-              style={styles.input}
-              value={newPasscode}
-              secureTextEntry
-              maxLength={4}
-              onChangeText={setNewPasscode}
-              keyboardType="numeric"
-              placeholder={"****"}
-            />
-          </View>
+        <View style={styles.authContainer}>
+          <Text style={styles.authTitle}>Budget Tracker</Text>
+          <Text style={styles.authMessage}>
+            {authError || "Please authenticate to access your budget data"}
+          </Text>
           <TouchableOpacity
-            style={styles.button}
-            onPress={changePasscode}>
-            <Text style={styles.buttonText}>Change Passcode</Text>
+            style={styles.authButton}
+            onPress={handleAuthentication}>
+            <Text style={styles.authButtonText}>Authenticate</Text>
           </TouchableOpacity>
         </View>
-      )}
+      ) : (
+        <View>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Security</Text>
+            <View style={styles.setting}>
+              <Text style={styles.settingLabel}>Budget Security</Text>
+              <Switch
+                value={biometricEnabled}
+                onValueChange={toggleBiometric}
+              //disabled={!biometricAvailable}
+              />
+            </View>
+            {!biometricEnabled && (
+              <Text style={styles.warning}>Authentication is not enabled.</Text>
+            )}
+          </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Database Management</Text>
-        <TouchableOpacity
-          style={[styles.button, styles.dangerButton]}
-          onPress={handleClearDatabase}>
-          <Text style={styles.buttonText}>Clear All Data</Text>
-        </TouchableOpacity>
-      </View>
-      </View>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Budget Alerts</Text>
+            <View style={styles.setting}>
+              <Text style={styles.settingLabel}>Budget Threshold (NGN)</Text>
+              <TextInput
+                style={styles.input}
+                value={budgetThreshold}
+                onChangeText={setBudgetThreshold}
+                keyboardType="numeric"
+                placeholder="Enter threshold amount"
+              />
+            </View>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={updateBudgetThreshold}>
+              <Text style={styles.buttonText}>Update Threshold</Text>
+            </TouchableOpacity>
+          </View>
+
+          {hasPasscode && biometricEnabled && (
+            <View style={styles.section}>
+              <TouchableOpacity onPress={handleDelete}>
+                <Text style={styles.sectionTitle}>Reset Passcode</Text>
+              </TouchableOpacity>
+              <View style={styles.setting}>
+                <Text style={styles.settingLabel}>Input new passcode</Text>
+                <TextInput
+                  style={styles.input}
+                  value={newPasscode}
+                  secureTextEntry
+                  maxLength={4}
+                  onChangeText={setNewPasscode}
+                  keyboardType="numeric"
+                  placeholder={"****"}
+                />
+              </View>
+              <TouchableOpacity
+                style={styles.button}
+                onPress={changePasscode}>
+                <Text style={styles.buttonText}>Change Passcode</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Database Management</Text>
+            <TouchableOpacity
+              style={[styles.button, styles.dangerButton]}
+              onPress={handleClearDatabase}>
+              <Text style={styles.buttonText}>Clear All Data</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       )}
       <PasscodeModal
         visible={showPasscodeModal}
@@ -318,7 +318,7 @@ export default function SettingsScreen() {
         onSubmit={submitPasscode}
         onInputChange={() => setIsWrongPasscode(false)}
       />
-      
+
     </ScrollView>
   )
 }

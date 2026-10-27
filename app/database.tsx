@@ -79,7 +79,10 @@ const validateString = (
   return { isValid: true }
 }
 
-const validateFullDate = (date: string): ValidationResult => {
+const validateFullDate = (
+  date: string,
+  allowFuture: boolean = false
+): ValidationResult => {
   // Check if the date string matches YYYY-MM-DD format
   const dateRegex = /^\d{4}-\d{2}-\d{2}$/
   if (!dateRegex.test(date)) {
@@ -110,7 +113,7 @@ const validateFullDate = (date: string): ValidationResult => {
 
   // Check if the date is in the future
   const dateObj = new Date(year, month - 1, day)
-  if (dateObj > new Date()) {
+  if (!allowFuture && dateObj > new Date()) {
     return { isValid: false, error: "Date cannot be in the future" }
   }
 
@@ -279,7 +282,8 @@ export const addPlannedPurchase = async (
 
   // Validate due date if provided
   if (dueDate) {
-    const dateValidation = validateFullDate(dueDate)
+    // Due dates are expected to be in the future
+    const dateValidation = validateFullDate(dueDate, true)
     if (!dateValidation.isValid) {
       Alert.alert("Validation Error", dateValidation.error)
       return false
@@ -381,21 +385,6 @@ export const markPurchaseAsBought = async (
           `UPDATE planned_purchases SET purchased = 1 WHERE id = ?;`,
           [id]
         )
-
-        // Check for existing expense
-        const existingExpense = await db.getFirstAsync(
-          "SELECT * FROM expenses WHERE item = ?",
-          [item]
-        )
-
-        if (existingExpense) {
-          Alert.alert(
-            "Already Added",
-            "This expense has already been recorded."
-          )
-          await db.execAsync("ROLLBACK")
-          return false
-        }
 
         // Add expense
         const currentDate = new Date().toISOString().split("T")[0]

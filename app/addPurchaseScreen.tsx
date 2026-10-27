@@ -32,7 +32,11 @@ export default function AddPurchaseScreen() {
     }
 
     try {
-      const success = await addNewPlannedPurchase(item.trim(), numericAmount)
+      const success = await addNewPlannedPurchase(
+        item.trim(),
+        numericAmount,
+        dueDate.trim() || undefined
+      )
 
       if (success) {
         // Schedule notification for planned purchase if due date is provided

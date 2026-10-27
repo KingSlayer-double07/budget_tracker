@@ -137,6 +137,31 @@ export default function AddIncomeScreen() {
     )
   }
 
+  const handleClearAll = () => {
+    Alert.alert(
+      "Clear All Income",
+      "Are you sure you want to delete all income? This action is irreversible.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Clear All",
+          style: "destructive",
+          onPress: async () => {
+            // Failures are already reported by the database layer
+            const success = await clearIncomeTable()
+            if (success) {
+              await refreshData()
+              Alert.alert("Success", "All income has been cleared")
+            }
+          },
+        },
+      ]
+    )
+  }
+
   const renderRightActions = (item: any) => {
     return (
       <TouchableOpacity
@@ -269,7 +294,7 @@ export default function AddIncomeScreen() {
           <Text style={styles.historyTitle}>Income History</Text>
           <TouchableOpacity
             style={styles.clearButton}
-            onPress={() => clearIncomeTable()}
+            onPress={handleClearAll}
             disabled={incomeList.length === 0}>
             <Text
               style={[

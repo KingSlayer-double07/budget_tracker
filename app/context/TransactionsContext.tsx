@@ -1,5 +1,5 @@
-import React, { createContext, useState, useEffect } from "react"
-import { getExpenses } from "../database"
+import React, { createContext } from "react"
+import { useBudget } from "./BudgetContext"
 
 interface Transaction {
   amount: number
@@ -17,18 +17,9 @@ export const TransactionsContext = createContext<
 export const TransactionsProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [transactions, setTransactions] = useState<Transaction[]>([])
-
-  useEffect(() => {
-    // Fetch or load transactions from storage here
-    const fetchTransactions = async () => {
-      const expenses = await getExpenses()
-      console.log("Fetched expenses:", expenses)
-      setTransactions(expenses as Transaction[])
-      console.log("Set Transactions", transactions)
-    }
-    fetchTransactions()
-  }, [])
+  // Derive from BudgetContext so stats stay in sync whenever expenses change
+  const { expenseList } = useBudget()
+  const transactions = expenseList as Transaction[]
 
   return (
     <TransactionsContext.Provider value={{ transactions }}>

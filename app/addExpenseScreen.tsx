@@ -138,6 +138,31 @@ export default function AddExpenseScreen() {
     )
   }
 
+  const handleClearAll = () => {
+    Alert.alert(
+      "Clear All Expenses",
+      "Are you sure you want to delete all expenses? This action is irreversible.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Clear All",
+          style: "destructive",
+          onPress: async () => {
+            // Failures are already reported by the database layer
+            const success = await clearExpensesTable()
+            if (success) {
+              await refreshData()
+              Alert.alert("Success", "All expenses have been cleared")
+            }
+          },
+        },
+      ]
+    )
+  }
+
   const renderRightActions = (item: any) => {
     return (
       <TouchableOpacity
@@ -270,7 +295,7 @@ export default function AddExpenseScreen() {
           <Text style={styles.historyTitle}>Expense History</Text>
           <TouchableOpacity
             style={styles.clearButton}
-            onPress={() => clearExpensesTable()}
+            onPress={handleClearAll}
             disabled={expenseList.length === 0}>
             <Text
               style={[

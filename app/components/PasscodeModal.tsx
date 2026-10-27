@@ -29,6 +29,8 @@ export const PasscodeModal: React.FC<PasscodeModalProps> = ({
 
   const handleSubmit = async (submittedPasscode?: string) => {
     const passcodeToSubmit = submittedPasscode ?? passcode
+    // Ignore incomplete input, e.g. tapping OK after the auto-submit cleared it
+    if (!/^\d{4}$/.test(passcodeToSubmit)) return
     onSubmit(passcodeToSubmit)
     setPasscode("")
   }

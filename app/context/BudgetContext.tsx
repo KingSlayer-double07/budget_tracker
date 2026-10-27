@@ -119,7 +119,8 @@ export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({
       await fetchData()
     }
 
-    // Check for recurring updates every hour
+    // Check once on mount, then every hour
+    checkRecurringUpdates()
     const interval = setInterval(checkRecurringUpdates, 60 * 60 * 1000)
     return () => clearInterval(interval)
   }, [fetchData])

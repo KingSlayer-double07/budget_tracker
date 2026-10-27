@@ -1,6 +1,6 @@
 import { Stack, useRouter } from "expo-router"
 import { useEffect, useState } from "react"
-import { handleRecurringUpdates, initializeDatabase } from "./database"
+import { initializeDatabase } from "./database"
 import {
   DarkTheme,
   DefaultTheme,
@@ -66,8 +66,6 @@ function AppContent() {
 
       // Set Authentication
       setAuthenticated(isAuthenticated)
-      // Handle recurring updates
-      handleRecurringUpdates()
 
       // Initialize notifications
       const notificationService = NotificationService.getInstance()

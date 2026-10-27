@@ -1,11 +1,11 @@
-import React, { useState } from "react"
+import React, { useEffect, useState } from "react"
 import { Modal, View, Text, StyleSheet, TouchableOpacity, TextInput } from "react-native"
 
 interface InputModalProps {
   visible: boolean
   title: string
   message: string
-  amount: string
+  amount?: number
   onConfirm: (newAmount: number) => void
   onCancel: () => void
 }
@@ -18,7 +18,15 @@ export default function InputModal({
   onConfirm,
   onCancel,
 }: InputModalProps) {
-    const [newAmount, setNewAmount] = useState(String(amount))
+  const [newAmount, setNewAmount] = useState("")
+
+  // The modal stays mounted, so prefill the current amount each time it opens
+  useEffect(() => {
+    if (visible) {
+      setNewAmount(amount != null ? String(amount) : "")
+    }
+  }, [visible, amount])
+
   return (
     <Modal
       visible={visible}
@@ -31,7 +39,7 @@ export default function InputModal({
           <Text style={styles.modalMessage}>{message}</Text>
           <TextInput
            style = {styles.input}
-           value = {newAmount === "undefined" && "" || newAmount}
+           value = {newAmount}
            onChangeText={setNewAmount}
            keyboardType="numeric"
            />

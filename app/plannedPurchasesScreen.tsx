@@ -15,7 +15,11 @@ import { clearPlannedPurchasesTable } from "./database"
 import InputModal from "./components/InputModal"
 
 export default function PlannedPurchasesScreen() {
-  const [selectedPurchase, setSelectedPurchase] = useState(null)
+  const [selectedPurchase, setSelectedPurchase] = useState<{
+    id: number
+    item: string
+    amount: number
+  } | null>(null)
   const [showInputModal, setShowInputModal] = useState(false)
   const {
     plannedPurchases,
@@ -255,12 +259,15 @@ export default function PlannedPurchasesScreen() {
         title="Enter New Amount"
         message={`Enter the new amount to be used`}
         amount={selectedPurchase?.amount}
-        onConfirm={(newAmount: number) => {handleEditPurchaseAmount(
-          selectedPurchase.id, 
-          selectedPurchase.amount,
-          newAmount,
-          selectedPurchase.item
-        )}}
+        onConfirm={(newAmount: number) => {
+          if (!selectedPurchase) return
+          handleEditPurchaseAmount(
+            selectedPurchase.id,
+            selectedPurchase.amount,
+            newAmount,
+            selectedPurchase.item
+          )
+        }}
         onCancel={() => {
           setShowInputModal(false)
         }}

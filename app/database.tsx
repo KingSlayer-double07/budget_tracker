@@ -1,7 +1,6 @@
 import * as SQLite from "expo-sqlite"
 import * as FileSystem from "expo-file-system"
 import { Alert } from "react-native"
-import { router } from "expo-router"
 import { SecureStorageService } from "./services/SecureStorageService"
 import { NotificationService } from "./services/NotificationService"
 
@@ -80,7 +79,10 @@ const validateString = (
   return { isValid: true }
 }
 
-const validateFullDate = (date: string): ValidationResult => {
+const validateFullDate = (
+  date: string,
+  allowFuture: boolean = false
+): ValidationResult => {
   // Check if the date string matches YYYY-MM-DD format
   const dateRegex = /^\d{4}-\d{2}-\d{2}$/
   if (!dateRegex.test(date)) {
@@ -111,7 +113,7 @@ const validateFullDate = (date: string): ValidationResult => {
 
   // Check if the date is in the future
   const dateObj = new Date(year, month - 1, day)
-  if (dateObj > new Date()) {
+  if (!allowFuture && dateObj > new Date()) {
     return { isValid: false, error: "Date cannot be in the future" }
   }
 
@@ -141,6 +143,14 @@ const validateDayOfMonth = (day: string): ValidationResult => {
   }
 
   return { isValid: true, error: "" }
+}
+
+// Format a date as YYYY-MM-DD in local time (toISOString uses UTC)
+const toLocalDateString = (date: Date): string => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
 }
 
 // Database configuration
@@ -280,7 +290,8 @@ export const addPlannedPurchase = async (
 
   // Validate due date if provided
   if (dueDate) {
-    const dateValidation = validateFullDate(dueDate)
+    // Due dates are expected to be in the future
+    const dateValidation = validateFullDate(dueDate, true)
     if (!dateValidation.isValid) {
       Alert.alert("Validation Error", dateValidation.error)
       return false
@@ -298,8 +309,6 @@ export const addPlannedPurchase = async (
           dueDate ? ` (Due: ${dueDate})` : ""
         }`
       )
-      Alert.alert("Success", "Purchase added successfully!")
-      router.push("/plannedPurchasesScreen")
       return true
     })) || false
   )
@@ -385,30 +394,14 @@ export const markPurchaseAsBought = async (
           [id]
         )
 
-        // Check for existing expense
-        const existingExpense = await db.getFirstAsync(
-          "SELECT * FROM expenses WHERE item = ?",
-          [item]
-        )
-
-        if (existingExpense) {
-          Alert.alert(
-            "Already Added",
-            "This expense has already been recorded."
-          )
-          await db.execAsync("ROLLBACK")
-          return false
-        }
-
         // Add expense
-        const currentDate = new Date().toISOString().split("T")[0]
+        const currentDate = toLocalDateString(new Date())
         await db.runAsync(
           `INSERT INTO expenses (item, amount, date) VALUES (?, ?, ?);`,
           [item, amount, currentDate]
         )
 
         await db.execAsync("COMMIT")
-        Alert.alert("Success", "Purchase marked as bought!")
         return true
       } catch (error) {
         await db.execAsync("ROLLBACK")
@@ -456,7 +449,6 @@ export const changePurchaseAmount = async (
         await db.execAsync("COMMIT")
         console.log(
         `Planned purchase edited: ${result.item} ; previous amount - ${result.amount}  new amount - ${newAmount}`)
-        Alert.alert("Success", "Purchase amount has been successfully edited!")
         return true
       } catch (error) {
         console.log(error)
@@ -524,7 +516,7 @@ export const addIncome = async (
 
   return (
     (await safeDatabaseOperation(async (db) => {
-      const date = new Date().toISOString().split("T")[0]
+      const date = toLocalDateString(new Date())
       const recurringDates = isRecurring ? recurringDate : null
 
       await db.runAsync(
@@ -534,8 +526,6 @@ export const addIncome = async (
       )
 
       console.log(`Income added: ${source}, ${amount}`)
-      Alert.alert("Success", "Income added successfully!")
-      router.back()
       return true
     })) || false
   )
@@ -570,7 +560,7 @@ export const addExpense = async (
 
   return (
     (await safeDatabaseOperation(async (db) => {
-      const date = new Date().toISOString().split("T")[0]
+      const date = toLocalDateString(new Date())
       const recurringDates = isRecurring ? recurringDate : null
 
       await db.runAsync(
@@ -596,8 +586,6 @@ export const addExpense = async (
       }
 
       console.log(`Expense added: ${item}, ${amount}`)
-      Alert.alert("Success", "Expense added successfully!")
-      router.back()
       return true
     })) || false
   )
@@ -639,6 +627,7 @@ export const deleteExpense = async (key: number): Promise<boolean> => {
 export const handleRecurringUpdates = async () => {
   const today = new Date()
   const currentDay = today.getDate()
+  const todayString = toLocalDateString(today)
 
   // Process recurring income
   try {
@@ -651,15 +640,17 @@ export const handleRecurringUpdates = async () => {
         income.recurring_date &&
         parseInt(income.recurring_date) === currentDay
       ) {
+        // Skip if this occurrence has already been recorded today
+        const alreadyAdded = await db.getFirstAsync(
+          "SELECT id FROM income WHERE source = ? AND amount = ? AND date = ?",
+          [income.source, income.amount, todayString]
+        )
+        if (alreadyAdded) continue
+
+        // Occurrences are plain entries so only the original keeps recurring
         await db.runAsync(
-          "INSERT INTO income (amount, source, date, is_recurring, recurring_date) VALUES (?, ?, ?, ?, ?)",
-          [
-            income.amount,
-            income.source,
-            today.toISOString().split("T")[0],
-            1,
-            income.recurring_date,
-          ]
+          "INSERT INTO income (amount, source, date, is_recurring, recurring_date) VALUES (?, ?, ?, 0, NULL)",
+          [income.amount, income.source, todayString]
         )
       }
     }
@@ -674,15 +665,17 @@ export const handleRecurringUpdates = async () => {
         expense.recurring_date &&
         parseInt(expense.recurring_date) === currentDay
       ) {
+        // Skip if this occurrence has already been recorded today
+        const alreadyAdded = await db.getFirstAsync(
+          "SELECT id FROM expenses WHERE item = ? AND amount = ? AND date = ?",
+          [expense.item, expense.amount, todayString]
+        )
+        if (alreadyAdded) continue
+
+        // Occurrences are plain entries so only the original keeps recurring
         await db.runAsync(
-          "INSERT INTO expenses (amount, item, date, is_recurring, recurring_date) VALUES (?, ?, ?, ?, ?)",
-          [
-            expense.amount,
-            expense.item,
-            today.toISOString().split("T")[0],
-            1,
-            expense.recurring_date,
-          ]
+          "INSERT INTO expenses (amount, item, date, is_recurring, recurring_date) VALUES (?, ?, ?, 0, NULL)",
+          [expense.amount, expense.item, todayString]
         )
       }
     }

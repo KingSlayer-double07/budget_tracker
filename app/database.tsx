@@ -145,6 +145,14 @@ const validateDayOfMonth = (day: string): ValidationResult => {
   return { isValid: true, error: "" }
 }
 
+// Format a date as YYYY-MM-DD in local time (toISOString uses UTC)
+const toLocalDateString = (date: Date): string => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
 // Database configuration
 const DB_NAME = "budgetTracker.db"
 
@@ -387,7 +395,7 @@ export const markPurchaseAsBought = async (
         )
 
         // Add expense
-        const currentDate = new Date().toISOString().split("T")[0]
+        const currentDate = toLocalDateString(new Date())
         await db.runAsync(
           `INSERT INTO expenses (item, amount, date) VALUES (?, ?, ?);`,
           [item, amount, currentDate]
@@ -508,7 +516,7 @@ export const addIncome = async (
 
   return (
     (await safeDatabaseOperation(async (db) => {
-      const date = new Date().toISOString().split("T")[0]
+      const date = toLocalDateString(new Date())
       const recurringDates = isRecurring ? recurringDate : null
 
       await db.runAsync(
@@ -552,7 +560,7 @@ export const addExpense = async (
 
   return (
     (await safeDatabaseOperation(async (db) => {
-      const date = new Date().toISOString().split("T")[0]
+      const date = toLocalDateString(new Date())
       const recurringDates = isRecurring ? recurringDate : null
 
       await db.runAsync(
@@ -614,14 +622,6 @@ export const deleteExpense = async (key: number): Promise<boolean> => {
       return true
     })) || false
   )
-}
-
-// Format a date as YYYY-MM-DD in local time (toISOString uses UTC)
-const toLocalDateString = (date: Date): string => {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, "0")
-  const day = String(date.getDate()).padStart(2, "0")
-  return `${year}-${month}-${day}`
 }
 
 export const handleRecurringUpdates = async () => {

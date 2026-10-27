@@ -636,9 +636,18 @@ export const deleteExpense = async (key: number): Promise<boolean> => {
   )
 }
 
+// Format a date as YYYY-MM-DD in local time (toISOString uses UTC)
+const toLocalDateString = (date: Date): string => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
 export const handleRecurringUpdates = async () => {
   const today = new Date()
   const currentDay = today.getDate()
+  const todayString = toLocalDateString(today)
 
   // Process recurring income
   try {
@@ -651,15 +660,17 @@ export const handleRecurringUpdates = async () => {
         income.recurring_date &&
         parseInt(income.recurring_date) === currentDay
       ) {
+        // Skip if this occurrence has already been recorded today
+        const alreadyAdded = await db.getFirstAsync(
+          "SELECT id FROM income WHERE source = ? AND amount = ? AND date = ?",
+          [income.source, income.amount, todayString]
+        )
+        if (alreadyAdded) continue
+
+        // Occurrences are plain entries so only the original keeps recurring
         await db.runAsync(
-          "INSERT INTO income (amount, source, date, is_recurring, recurring_date) VALUES (?, ?, ?, ?, ?)",
-          [
-            income.amount,
-            income.source,
-            today.toISOString().split("T")[0],
-            1,
-            income.recurring_date,
-          ]
+          "INSERT INTO income (amount, source, date, is_recurring, recurring_date) VALUES (?, ?, ?, 0, NULL)",
+          [income.amount, income.source, todayString]
         )
       }
     }
@@ -674,15 +685,17 @@ export const handleRecurringUpdates = async () => {
         expense.recurring_date &&
         parseInt(expense.recurring_date) === currentDay
       ) {
+        // Skip if this occurrence has already been recorded today
+        const alreadyAdded = await db.getFirstAsync(
+          "SELECT id FROM expenses WHERE item = ? AND amount = ? AND date = ?",
+          [expense.item, expense.amount, todayString]
+        )
+        if (alreadyAdded) continue
+
+        // Occurrences are plain entries so only the original keeps recurring
         await db.runAsync(
-          "INSERT INTO expenses (amount, item, date, is_recurring, recurring_date) VALUES (?, ?, ?, ?, ?)",
-          [
-            expense.amount,
-            expense.item,
-            today.toISOString().split("T")[0],
-            1,
-            expense.recurring_date,
-          ]
+          "INSERT INTO expenses (amount, item, date, is_recurring, recurring_date) VALUES (?, ?, ?, 0, NULL)",
+          [expense.amount, expense.item, todayString]
         )
       }
     }

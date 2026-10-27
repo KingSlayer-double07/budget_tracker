@@ -25,7 +25,6 @@ export default function SettingsScreen() {
   const [newPasscode, setNewPasscode] = useState("")
   const { totalIncome, refreshData } = useBudget()
   const authService = AuthenticationService.getInstance()
-  const [authenticated, setAuthenticated] = useState(false)
   const [isWrongPasscode, setIsWrongPasscode] = useState(false)
   const {
     handlePasscodeSubmit,
@@ -43,11 +42,10 @@ export default function SettingsScreen() {
 
   const initializeScreen = async () => {
     try {
-      // Set Authentication
-      setAuthenticated(isAuthenticated)
-
-      // Authenticate User
-      await handleAuthentication()
+      // Authenticate User, unless already authenticated at the app level
+      if (!isAuthenticated) {
+        await handleAuthentication()
+      }
 
       // Load Settings
       await loadSettings()
@@ -224,7 +222,7 @@ export default function SettingsScreen() {
     <ScrollView style={styles.container}>
       <Text style={styles.heading}>Settings</Text>
 
-      {!authenticated && !isAuthenticated ? (
+      {!isAuthenticated ? (
         <View style={styles.authContainer}>
           <Text style={styles.authTitle}>Budget Tracker</Text>
           <Text style={styles.authMessage}>
@@ -312,7 +310,6 @@ export default function SettingsScreen() {
         isNewPasscode={isNewPasscode}
         isWrongPasscode={isWrongPasscode}
         onCancel={() => {
-          setAuthenticated(false)
           setShowPasscodeModal(false)
         }}
         onSubmit={submitPasscode}

@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState } from "react"
 import { AuthenticationService } from "../services/AuthenticationService"
-import { SecureStorageService } from "../services/SecureStorageService"
 
 interface AuthContextType {
   isAuthenticated: boolean
@@ -45,7 +44,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const handleAuthentication = async () => {
     try {
       // Check if Authentication is enabled
-      const secureStorage = SecureStorageService.getInstance
       const authEnabled = await authService.isBiometricEnabled()
       setAuthEnabled(authEnabled)
       if (!authEnabled) {

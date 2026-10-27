@@ -14,7 +14,6 @@ import { SecureStorageService } from "./services/SecureStorageService"
 import { NotificationService } from "./services/NotificationService"
 import { useBudget } from "./context/BudgetContext"
 import { clearAllData } from "./database"
-import { PasscodeModal } from "./components/PasscodeModal"
 import { useAuth } from "./context/AuthContext"
 
 export default function SettingsScreen() {
@@ -25,16 +24,8 @@ export default function SettingsScreen() {
   const [newPasscode, setNewPasscode] = useState("")
   const { totalIncome, refreshData } = useBudget()
   const authService = AuthenticationService.getInstance()
-  const [isWrongPasscode, setIsWrongPasscode] = useState(false)
-  const {
-    handlePasscodeSubmit,
-    isNewPasscode,
-    isAuthenticated,
-    showPasscodeModal,
-    setShowPasscodeModal,
-    handleAuthentication,
-    authError
-  } = useAuth()
+  // The passcode prompt is rendered once by the root layout
+  const { isAuthenticated, handleAuthentication, authError } = useAuth()
 
   useEffect(() => {
     initializeScreen()
@@ -94,11 +85,6 @@ export default function SettingsScreen() {
       console.error("Error loading settings:", error)
       Alert.alert("Error", "Failed to load settings")
     }
-  }
-
-  const submitPasscode = async (passcode: string) => {
-    const success = await handlePasscodeSubmit(passcode)
-    setIsWrongPasscode(!success)
   }
 
   const toggleBiometric = async () => {
@@ -305,17 +291,6 @@ export default function SettingsScreen() {
           </View>
         </View>
       )}
-      <PasscodeModal
-        visible={showPasscodeModal}
-        isNewPasscode={isNewPasscode}
-        isWrongPasscode={isWrongPasscode}
-        onCancel={() => {
-          setShowPasscodeModal(false)
-        }}
-        onSubmit={submitPasscode}
-        onInputChange={() => setIsWrongPasscode(false)}
-      />
-
     </ScrollView>
   )
 }

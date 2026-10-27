@@ -1,7 +1,6 @@
 import * as SQLite from "expo-sqlite"
 import * as FileSystem from "expo-file-system"
 import { Alert } from "react-native"
-import { router } from "expo-router"
 import { SecureStorageService } from "./services/SecureStorageService"
 import { NotificationService } from "./services/NotificationService"
 
@@ -298,8 +297,6 @@ export const addPlannedPurchase = async (
           dueDate ? ` (Due: ${dueDate})` : ""
         }`
       )
-      Alert.alert("Success", "Purchase added successfully!")
-      router.push("/plannedPurchasesScreen")
       return true
     })) || false
   )
@@ -408,7 +405,6 @@ export const markPurchaseAsBought = async (
         )
 
         await db.execAsync("COMMIT")
-        Alert.alert("Success", "Purchase marked as bought!")
         return true
       } catch (error) {
         await db.execAsync("ROLLBACK")
@@ -456,7 +452,6 @@ export const changePurchaseAmount = async (
         await db.execAsync("COMMIT")
         console.log(
         `Planned purchase edited: ${result.item} ; previous amount - ${result.amount}  new amount - ${newAmount}`)
-        Alert.alert("Success", "Purchase amount has been successfully edited!")
         return true
       } catch (error) {
         console.log(error)
@@ -534,8 +529,6 @@ export const addIncome = async (
       )
 
       console.log(`Income added: ${source}, ${amount}`)
-      Alert.alert("Success", "Income added successfully!")
-      router.back()
       return true
     })) || false
   )
@@ -596,8 +589,6 @@ export const addExpense = async (
       }
 
       console.log(`Expense added: ${item}, ${amount}`)
-      Alert.alert("Success", "Expense added successfully!")
-      router.back()
       return true
     })) || false
   )

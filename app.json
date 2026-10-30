@@ -7,7 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "platforms": [
       "ios",
       "android"
@@ -29,10 +28,7 @@
         "backgroundColor": "#043927"
       },
       "package": "com.kingslayer_double07.budget_tracker",
-      "permissions": [],
-      "useNextNotificationsApi": true,
-      "minSdkVersion": 21,
-      "targetSdkVersion": 34
+      "permissions": []
     },
     "plugins": [
       "expo-router",
@@ -47,7 +43,11 @@
       ],
       "expo-sqlite",
       "expo-asset",
-      "expo-notifications"
+      "expo-notifications",
+      "expo-font",
+      "expo-web-browser",
+      "expo-secure-store",
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": true

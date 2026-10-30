@@ -1,4 +1,5 @@
 import * as Notifications from "expo-notifications"
+import Constants, { ExecutionEnvironment } from "expo-constants"
 import { Platform } from "react-native"
 import { getTotalIncome, getTotalExpenses } from "../database"
 
@@ -41,8 +42,13 @@ export class NotificationService {
       throw new Error("Permission not granted for notifications")
     }
 
-    // Set up notification categories
-    await this.setupNotificationCategories()
+    // Set up notification categories. A failure here shouldn't stop the
+    // rest of initialization: Android falls back to a default channel.
+    try {
+      await this.setupNotificationCategories()
+    } catch (error) {
+      console.error("Error setting up notification channels:", error)
+    }
 
     this.isInitialized = true
   }
@@ -65,8 +71,12 @@ export class NotificationService {
       )
     }
 
-    // Set up notification channels for Android
-    if (Platform.OS === "android") {
+    // Set up notification channels for Android. Expo Go doesn't register the
+    // native channel provider, so every channel call rejects there with a
+    // NullPointerException; notifications use the default channel instead.
+    const isExpoGo =
+      Constants.executionEnvironment === ExecutionEnvironment.StoreClient
+    if (Platform.OS === "android" && !isExpoGo) {
       await Notifications.setNotificationChannelAsync(
         "recurring-transactions",
         {
@@ -123,20 +133,18 @@ export class NotificationService {
         identifier: `${identifier}-added`,
       })
 
-      // Get the day of the month from the recurring date
-      const dayOfMonth = recurringDate.getDate()
+      // Get the day of the month from the recurring date. The monthly trigger
+      // rejects days past the end of the current month, so days 29-31 are
+      // capped to this month's last day.
+      const now = new Date()
+      const daysInMonth = new Date(
+        now.getFullYear(),
+        now.getMonth() + 1,
+        0
+      ).getDate()
+      const dayOfMonth = Math.min(recurringDate.getDate(), daysInMonth)
 
-      // Create a new date for the next occurrence
-      const nextDate = new Date()
-      nextDate.setDate(dayOfMonth)
-      nextDate.setHours(9, 0, 0, 0) // Set to 9:00 AM
-
-      // If the day has already passed this month, schedule for next month
-      if (nextDate < new Date()) {
-        nextDate.setMonth(nextDate.getMonth() + 1)
-      }
-
-      // Schedule the recurring notification
+      // Schedule the recurring notification for 9:00 AM on that day every month
       await Notifications.scheduleNotificationAsync({
         content: {
           title,
@@ -149,8 +157,10 @@ export class NotificationService {
           },
         },
         trigger: {
-          date: nextDate,
-          repeats: true,
+          type: Notifications.SchedulableTriggerInputTypes.MONTHLY,
+          day: dayOfMonth,
+          hour: 9,
+          minute: 0,
           channelId: "recurring-transactions",
         },
         identifier: `${identifier}-recurring`,
@@ -246,6 +256,7 @@ export class NotificationService {
           data: { type: "PURCHASE_REMINDER", identifier },
         },
         trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
           date: reminderDate,
           channelId: "purchase-reminders",
         },

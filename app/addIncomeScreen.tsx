@@ -17,7 +17,7 @@ import { useBudget } from "./context/BudgetContext"
 import { NotificationService } from "./services/NotificationService"
 import { clearIncomeTable } from "./database"
 import ConfirmationModal from "./components/ConfirmationModal"
-import { Swipeable } from "react-native-gesture-handler"
+import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable"
 import { Ionicons } from "@expo/vector-icons"
 
 export default function AddIncomeScreen() {

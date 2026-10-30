@@ -16,7 +16,7 @@ import { useBudget } from "./context/BudgetContext"
 import { NotificationService } from "./services/NotificationService"
 import { clearExpensesTable } from "./database"
 import ConfirmationModal from "./components/ConfirmationModal"
-import { Swipeable } from "react-native-gesture-handler"
+import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable"
 
 export default function AddExpenseScreen() {
   const [description, setDescription] = useState("")

@@ -1,4 +1,5 @@
 import * as Notifications from "expo-notifications"
+import Constants, { ExecutionEnvironment } from "expo-constants"
 import { Platform } from "react-native"
 import { getTotalIncome, getTotalExpenses } from "../database"
 
@@ -70,8 +71,12 @@ export class NotificationService {
       )
     }
 
-    // Set up notification channels for Android
-    if (Platform.OS === "android") {
+    // Set up notification channels for Android. Expo Go doesn't register the
+    // native channel provider, so every channel call rejects there with a
+    // NullPointerException; notifications use the default channel instead.
+    const isExpoGo =
+      Constants.executionEnvironment === ExecutionEnvironment.StoreClient
+    if (Platform.OS === "android" && !isExpoGo) {
       await Notifications.setNotificationChannelAsync(
         "recurring-transactions",
         {

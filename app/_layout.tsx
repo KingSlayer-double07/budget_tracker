@@ -1,11 +1,12 @@
-import { Stack, useRouter } from "expo-router"
-import { useEffect, useState } from "react"
-import { initializeDatabase } from "./database"
 import {
+  Stack,
+  useRouter,
   DarkTheme,
   DefaultTheme,
   ThemeProvider,
-} from "@react-navigation/native"
+} from "expo-router"
+import { useEffect, useState } from "react"
+import { initializeDatabase } from "./database"
 import { BudgetProvider } from "./context/BudgetContext"
 import { AuthProvider, useAuth } from "./context/AuthContext"
 import { GestureHandlerRootView } from "react-native-gesture-handler"

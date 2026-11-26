@@ -655,6 +655,26 @@ export const stopRecurring = async (
   )
 }
 
+// Stop a recurring entry identified by its name and day of month, for
+// notification actions that don't know the row id
+export const stopRecurringByName = async (
+  table: "income" | "expenses",
+  name: string,
+  recurringDay: string
+): Promise<boolean> => {
+  const nameColumn = table === "income" ? "source" : "item"
+  return (
+    (await safeDatabaseOperation(async (db) => {
+      await db.runAsync(
+        `UPDATE ${table} SET is_recurring = 0, recurring_date = NULL
+         WHERE is_recurring = 1 AND ${nameColumn} = ? AND recurring_date = ?;`,
+        [name, recurringDay]
+      )
+      return true
+    })) || false
+  )
+}
+
 export const handleRecurringUpdates = async () => {
   const today = new Date()
   const currentDay = today.getDate()

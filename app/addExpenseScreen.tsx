@@ -82,7 +82,12 @@ export default function AddExpenseScreen() {
             `Your recurring expense of NGN${numAmount.toLocaleString()} for ${description} is due next on ${nextDate.toLocaleDateString()}`,
             nextDate,
             `recurring-expense-${description}-${recurringDate}`,
-            description
+            description,
+            {
+              table: "expenses",
+              name: description.trim(),
+              recurringDay: recurringDate,
+            }
           )
         }
 

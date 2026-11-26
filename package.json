@@ -7,11 +7,16 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "jest --watchAll",
-    "lint": "expo lint"
+    "test": "jest",
+    "lint": "expo lint",
+    "test:watch": "jest --watchAll"
   },
   "jest": {
-    "preset": "jest-expo"
+    "preset": "jest-expo",
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/test-utils/"
+    ]
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -46,6 +51,7 @@
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@types/jest": "30.0.0",
+    "@types/node": "^26.6.6",
     "@types/react": "~19.3.0",
     "jest": "~30.5.2",
     "jest-expo": "~58.0.15",

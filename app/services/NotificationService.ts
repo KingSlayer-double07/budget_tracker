@@ -247,7 +247,6 @@ export class NotificationService {
 
     // Ensure the reminder date is in the future
     if (reminderDate > new Date()) {
-      console.log("Reminder Date: ", reminderDate)
       await Notifications.scheduleNotificationAsync({
         content: {
           title,

@@ -72,18 +72,9 @@ function AppContent() {
       const notificationService = NotificationService.getInstance()
       await notificationService.initialize()
 
-      // Set up notification listeners
-      const notificationListener = notificationService.addNotificationListener(
-        (notification) => {
-          console.log("Received notification:", notification)
-        }
-      )
-
       const responseListener =
         notificationService.addNotificationResponseListener(
           async (response) => {
-            console.log("Notification response:", response)
-
             const { actionIdentifier, notification } = response
             const { data } = notification.request.content
 
@@ -91,10 +82,6 @@ function AppContent() {
               try {
                 await notificationService.cancelFutureOccurrences(
                   data.selected as string,
-                  data.identifier
-                )
-                console.log(
-                  "Future occurrences cancelled for:",
                   data.identifier
                 )
               } catch (error) {
@@ -109,7 +96,6 @@ function AppContent() {
 
       // Cleanup listeners on unmount
       return () => {
-        notificationService.removeNotificationListener(notificationListener)
         notificationService.removeNotificationListener(responseListener)
       }
     } catch (error) {

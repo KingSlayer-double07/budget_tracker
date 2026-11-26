@@ -135,7 +135,6 @@ export class AuthenticationService {
         return false // The UI will handle showing the passcode modal
       } else {
         // If biometrics are not available, fall back to passcode
-        console.log("Biometrics not available, falling back to passcode")
         return false // The UI will handle showing the passcode modal
       }
     } catch (error) {

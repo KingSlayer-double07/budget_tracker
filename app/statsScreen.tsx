@@ -2,10 +2,13 @@ import React, { useContext } from "react"
 import { View, ScrollView, Text } from "react-native"
 import TrendGraph from "./components/TrendGraph"
 import { Transaction } from "./components/TrendGraph"
+import CategoryBreakdown from "./components/CategoryBreakdown"
 import { TransactionsContext } from "./context/TransactionsContext"
+import { useBudget } from "./context/BudgetContext"
 
 export default function StatsScreen() {
   const context = useContext(TransactionsContext) || { transactions: [] }
+  const { categoryTotals } = useBudget()
 
   if (!context) {
     return <Text>Loading...</Text>
@@ -34,7 +37,10 @@ export default function StatsScreen() {
           </Text>
         </View>
       ) : (
-        <TrendGraph transactions={validTransactions} />
+        <>
+          <CategoryBreakdown totals={categoryTotals} />
+          <TrendGraph transactions={validTransactions} />
+        </>
       )}
     </ScrollView>
   )

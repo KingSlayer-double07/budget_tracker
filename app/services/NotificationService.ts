@@ -1,7 +1,6 @@
 import * as Notifications from "expo-notifications"
 import Constants, { ExecutionEnvironment } from "expo-constants"
 import { Platform } from "react-native"
-import { getTotalIncome, getTotalExpenses } from "../database"
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
@@ -197,28 +196,18 @@ export class NotificationService {
     }
   }
 
-  // Schedule a budget limit alert
-  public async scheduleBudgetAlert(
-    title: string,
-    body: string,
-    threshold: number
-  ): Promise<void> {
-    const checkBudget = async () => {
-      const totalExpenses = await getTotalExpenses()
-      if (totalExpenses >= threshold) {
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title,
-            body,
-            sound: true,
-            data: { type: "BUDGET_ALERT" },
-          },
-          trigger: null,
-          identifier: `budget-alert-${Date.now()}`,
-        })
-      }
-    }
-    checkBudget()
+  // Show a budget limit alert immediately
+  public async sendBudgetAlert(title: string, body: string): Promise<void> {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        sound: true,
+        data: { type: "BUDGET_ALERT" },
+      },
+      trigger: null,
+      identifier: `budget-alert-${Date.now()}`,
+    })
   }
 
   // Schedule a purchase due date reminder

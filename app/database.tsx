@@ -470,6 +470,54 @@ export const getTotalExpenses = async (): Promise<number> => {
   )
 }
 
+// Total expenses recorded in the given month (defaults to the current month)
+export const getMonthlyExpenses = async (
+  month: Date = new Date()
+): Promise<number> => {
+  const monthPrefix = toLocalDateString(month).slice(0, 7) // YYYY-MM
+  return (
+    (await safeDatabaseOperation(async (db) => {
+      const result = await db.getFirstAsync<DatabaseResult>(
+        `SELECT SUM(amount) as total FROM expenses WHERE date LIKE ?;`,
+        [`${monthPrefix}%`]
+      )
+      return result?.total || 0
+    })) || 0
+  )
+}
+
+const BUDGET_THRESHOLD_KEY = "budget_threshold"
+// Month (YYYY-MM) in which the budget alert last fired, so it fires once per month
+export const BUDGET_ALERT_MONTH_KEY = "budget_alert_month"
+
+// Notify once per month when this month's expenses reach the budget threshold
+export const checkBudgetThreshold = async (): Promise<void> => {
+  try {
+    const secureStorage = SecureStorageService.getInstance()
+    const threshold = parseFloat(
+      (await secureStorage.getSecureItem(BUDGET_THRESHOLD_KEY)) ?? ""
+    )
+    if (isNaN(threshold) || threshold <= 0) return
+
+    const currentMonth = toLocalDateString(new Date()).slice(0, 7)
+    const alertedMonth = await secureStorage.getSecureItem(
+      BUDGET_ALERT_MONTH_KEY
+    )
+    if (alertedMonth === currentMonth) return
+
+    const monthlyExpenses = await getMonthlyExpenses()
+    if (monthlyExpenses < threshold) return
+
+    await NotificationService.getInstance().sendBudgetAlert(
+      "Budget Limit Alert",
+      `You've spent ${monthlyExpenses.toLocaleString()} NGN this month, reaching your ${threshold.toLocaleString()} NGN budget`
+    )
+    await secureStorage.saveSecureItem(BUDGET_ALERT_MONTH_KEY, currentMonth)
+  } catch (error) {
+    console.error("Error checking budget threshold:", error)
+  }
+}
+
 export const getBalance = async (): Promise<number> => {
   const income = await getTotalIncome()
   const expenses = await getTotalExpenses()
@@ -556,23 +604,6 @@ export const addExpense = async (
         [item.trim(), amount, date, isRecurring ? 1 : 0, recurringDates]
       )
 
-      // Check budget threshold immediately after adding expense
-      const totalExpenses = await getTotalExpenses()
-      const secureStorage = SecureStorageService.getInstance()
-      const threshold = await secureStorage.getSecureItem("budget_threshold")
-
-      if (threshold) {
-        const thresholdAmount = parseFloat(threshold)
-        if (totalExpenses >= thresholdAmount) {
-          const notificationService = NotificationService.getInstance()
-          await notificationService.scheduleBudgetAlert(
-            "Budget Limit Alert",
-            `You have reached ${thresholdAmount.toLocaleString()} NGN in expenses`,
-            thresholdAmount
-          )
-        }
-      }
-
       return true
     })) || false
   )
@@ -603,6 +634,22 @@ export const deleteExpense = async (key: number): Promise<boolean> => {
     (await safeDatabaseOperation(async (db) => {
       await db.runAsync(`DELETE FROM expenses WHERE id = ?;`, [key])
       await delay(100) // Add a small delay
+      return true
+    })) || false
+  )
+}
+
+// Stop a recurring income or expense from being added again in future months
+export const stopRecurring = async (
+  table: "income" | "expenses",
+  id: number
+): Promise<boolean> => {
+  return (
+    (await safeDatabaseOperation(async (db) => {
+      await db.runAsync(
+        `UPDATE ${table} SET is_recurring = 0, recurring_date = NULL WHERE id = ?;`,
+        [id]
+      )
       return true
     })) || false
   )

@@ -11,9 +11,12 @@ import {
 } from "react-native"
 import { AuthenticationService } from "./services/AuthenticationService"
 import { SecureStorageService } from "./services/SecureStorageService"
-import { NotificationService } from "./services/NotificationService"
 import { useBudget } from "./context/BudgetContext"
-import { clearAllData } from "./database"
+import {
+  clearAllData,
+  checkBudgetThreshold,
+  BUDGET_ALERT_MONTH_KEY,
+} from "./database"
 import { useAuth } from "./context/AuthContext"
 
 export default function SettingsScreen() {
@@ -22,7 +25,7 @@ export default function SettingsScreen() {
   const [budgetThreshold, setBudgetThreshold] = useState("")
   const [hasPasscode, setHasPasscode] = useState(false)
   const [newPasscode, setNewPasscode] = useState("")
-  const { totalIncome, refreshData } = useBudget()
+  const { refreshData } = useBudget()
   const authService = AuthenticationService.getInstance()
   // The passcode prompt is rendered once by the root layout
   const { isAuthenticated, handleAuthentication, authError } = useAuth()
@@ -63,14 +66,8 @@ export default function SettingsScreen() {
 
       // Load budget threshold
       const threshold = await secureStorage.getSecureItem("budget_threshold")
-      if (threshold) {
-        setBudgetThreshold(threshold)
-      } else {
-        // Default to 80% of total income
-        const defaultThreshold = (totalIncome * 0.8).toString()
-        setBudgetThreshold(defaultThreshold)
-        await secureStorage.saveSecureItem("budget_threshold", defaultThreshold)
-      }
+      // No alerts until a monthly budget is set
+      setBudgetThreshold(threshold ?? "")
 
       //Load Passcode
       const hasPasscode = await authService.hasPasscode()
@@ -123,13 +120,9 @@ export default function SettingsScreen() {
         threshold.toString()
       )
 
-      // Schedule budget alert with new threshold
-      const notificationService = NotificationService.getInstance()
-      await notificationService.scheduleBudgetAlert(
-        "Budget Limit Alert",
-        `You have reached ${threshold.toLocaleString()} NGN in expenses`,
-        threshold
-      )
+      // Allow the alert to fire again this month against the new threshold
+      await secureStorage.deleteSecureItem(BUDGET_ALERT_MONTH_KEY)
+      await checkBudgetThreshold()
 
       Alert.alert("Success", "Budget threshold updated successfully")
     } catch (error) {
@@ -240,7 +233,7 @@ export default function SettingsScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Budget Alerts</Text>
             <View style={styles.setting}>
-              <Text style={styles.settingLabel}>Budget Threshold (NGN)</Text>
+              <Text style={styles.settingLabel}>Monthly Budget (NGN)</Text>
               <TextInput
                 style={styles.input}
                 value={budgetThreshold}

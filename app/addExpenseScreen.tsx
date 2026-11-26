@@ -13,6 +13,7 @@ import {
 } from "react-native"
 import { useRouter } from "expo-router"
 import { useBudget } from "./context/BudgetContext"
+import { stopRecurring } from "./database"
 import { NotificationService } from "./services/NotificationService"
 import { clearExpensesTable } from "./database"
 import ConfirmationModal from "./components/ConfirmationModal"
@@ -177,6 +178,11 @@ export default function AddExpenseScreen() {
     if (!selectedExpense) return
 
     try {
+      // Clear the recurring flag so no further occurrences are recorded
+      const stopped = await stopRecurring("expenses", selectedExpense.id)
+      if (!stopped) throw new Error("Failed to stop recurring expenses")
+      await refreshData()
+
       const notificationService = NotificationService.getInstance()
       await notificationService.cancelFutureOccurrences(
         selectedExpense.item,

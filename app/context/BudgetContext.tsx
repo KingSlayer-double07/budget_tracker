@@ -21,6 +21,7 @@ import {
   deleteIncome,
   deleteExpense,
   handleRecurringUpdates,
+  checkBudgetThreshold,
 } from "../database"
 
 interface BudgetContextType {
@@ -99,6 +100,9 @@ export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({
       setTotalIncome(incomeTotal)
       setTotalExpenses(expensesTotal)
       setBalance(currentBalance)
+
+      // Runs after every data change, so it covers manual, bought and recurring expenses
+      await checkBudgetThreshold()
     } catch (err) {
       setError("Failed to fetch data. Please try again.")
       console.error("Error fetching data:", err)

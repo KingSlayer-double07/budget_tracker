@@ -11,9 +11,43 @@ interface SpendingTrendsChartProps {
   transactions: Transaction[]
 }
 
-interface GroupedData {
+export interface GroupedData {
   name: string
   total: number
+}
+
+// Group expenses into weekly, monthly or yearly totals, oldest first
+export const groupDataByTimeframe = (
+  transactions: Transaction[],
+  timeframe: string
+): GroupedData[] => {
+  // Keyed by a sortable YYYY-MM-W string so periods from different years
+  // stay separate and the graph reads oldest to newest
+  const dataMap: Record<string, GroupedData> = {}
+  transactions.forEach(({ amount, date }: Transaction) => {
+    // Stored dates are local YYYY-MM-DD; parse the parts so they aren't
+    // treated as UTC midnight
+    const [year, month, day] = date.slice(0, 10).split("-").map(Number)
+    const shortYear = String(year).slice(2)
+    let key: string
+    let name: string
+    if (timeframe === "weekly") {
+      const week = Math.ceil(day / 7)
+      key = `${year}-${String(month).padStart(2, "0")}-${week}`
+      name = `W${week} ${month}/${shortYear}`
+    } else if (timeframe === "monthly") {
+      key = `${year}-${String(month).padStart(2, "0")}`
+      name = `${month}/${shortYear}`
+    } else {
+      key = String(year)
+      name = key
+    }
+    if (!dataMap[key]) dataMap[key] = { name, total: 0 }
+    dataMap[key].total += amount
+  })
+  return Object.keys(dataMap)
+    .sort()
+    .map((key) => dataMap[key])
 }
 
 const TrendGraph: React.FC<SpendingTrendsChartProps> = ({ transactions }) => {
@@ -24,39 +58,6 @@ const TrendGraph: React.FC<SpendingTrendsChartProps> = ({ transactions }) => {
     const groupedData = groupDataByTimeframe(transactions, timeframe)
     setChartData(transactions.length ? groupedData : [])
   }, [transactions, timeframe])
-
-  const groupDataByTimeframe = (
-    transactions: Transaction[],
-    timeframe: string
-  ): GroupedData[] => {
-    // Keyed by a sortable YYYY-MM-W string so periods from different years
-    // stay separate and the graph reads oldest to newest
-    const dataMap: Record<string, GroupedData> = {}
-    transactions.forEach(({ amount, date }: Transaction) => {
-      // Stored dates are local YYYY-MM-DD; parse the parts so they aren't
-      // treated as UTC midnight
-      const [year, month, day] = date.slice(0, 10).split("-").map(Number)
-      const shortYear = String(year).slice(2)
-      let key: string
-      let name: string
-      if (timeframe === "weekly") {
-        const week = Math.ceil(day / 7)
-        key = `${year}-${String(month).padStart(2, "0")}-${week}`
-        name = `W${week} ${month}/${shortYear}`
-      } else if (timeframe === "monthly") {
-        key = `${year}-${String(month).padStart(2, "0")}`
-        name = `${month}/${shortYear}`
-      } else {
-        key = String(year)
-        name = key
-      }
-      if (!dataMap[key]) dataMap[key] = { name, total: 0 }
-      dataMap[key].total += amount
-    })
-    return Object.keys(dataMap)
-      .sort()
-      .map((key) => dataMap[key])
-  }
 
   const LineGraph: React.FC<{ chartData: GroupedData[] }> = ({ chartData }) => {
     // Add margins for labels

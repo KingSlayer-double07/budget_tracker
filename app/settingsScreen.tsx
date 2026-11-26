@@ -18,6 +18,7 @@ import {
   BUDGET_ALERT_MONTH_KEY,
 } from "./database"
 import { useAuth } from "./context/AuthContext"
+import CategoryManager from "./components/CategoryManager"
 
 export default function SettingsScreen() {
   const [biometricEnabled, setBiometricEnabled] = useState(false)
@@ -248,6 +249,8 @@ export default function SettingsScreen() {
               <Text style={styles.buttonText}>Update Threshold</Text>
             </TouchableOpacity>
           </View>
+
+          <CategoryManager />
 
           {hasPasscode && biometricEnabled && (
             <View style={styles.section}>

@@ -12,6 +12,16 @@ Notifications.setNotificationHandler({
   }),
 })
 
+export const RECURRING_CATEGORY = "RECURRING_TRANSACTION"
+export const CANCEL_FUTURE_ACTION = "CANCEL_FUTURE"
+
+// Which recurring entry a reminder belongs to, so its actions can find it
+export interface RecurringTarget {
+  table: "income" | "expenses"
+  name: string
+  recurringDay: string
+}
+
 export class NotificationService {
   private static instance: NotificationService
   private isInitialized: boolean = false
@@ -53,21 +63,20 @@ export class NotificationService {
   }
 
   private async setupNotificationCategories(): Promise<void> {
-    // Set up notification categories for iOS
-    if (Platform.OS === "ios") {
+    // Action buttons shown on recurring transaction reminders
+    try {
       await Notifications.setNotificationCategoryAsync(
-        "RECURRING_TRANSACTION",
+        RECURRING_CATEGORY,
         [
           {
-            identifier: "MARK_AS_PAID",
-            buttonTitle: "Mark as Paid",
-          },
-          {
-            identifier: "POSTPONE",
-            buttonTitle: "Postpone",
+            identifier: CANCEL_FUTURE_ACTION,
+            buttonTitle: "Stop recurring",
+            options: { opensAppToForeground: true },
           },
         ]
       )
+    } catch (error) {
+      console.error("Error setting up notification categories:", error)
     }
 
     // Set up notification channels for Android. Expo Go doesn't register the
@@ -111,7 +120,8 @@ export class NotificationService {
     body: string,
     recurringDate: Date,
     identifier: string,
-    description: string
+    description: string,
+    target: RecurringTarget
   ): Promise<void> {
     try {
       // Cancel any existing notification with this identifier
@@ -152,8 +162,9 @@ export class NotificationService {
           data: {
             type: "RECURRING_TRANSACTION",
             identifier,
-            actions: ["MARK_AS_PAID", "POSTPONE", "CANCEL_FUTURE"],
+            ...target,
           },
+          categoryIdentifier: RECURRING_CATEGORY,
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.MONTHLY,

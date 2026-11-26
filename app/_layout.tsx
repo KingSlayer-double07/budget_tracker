@@ -6,7 +6,8 @@ import {
   ThemeProvider,
 } from "expo-router"
 import { useEffect, useState } from "react"
-import { initializeDatabase } from "./database"
+import * as Notifications from "expo-notifications"
+import { initializeDatabase, stopRecurringByName } from "./database"
 import { BudgetProvider } from "./context/BudgetContext"
 import { AuthProvider, useAuth } from "./context/AuthContext"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
@@ -19,7 +20,10 @@ import {
   AppState,
   Alert,
 } from "react-native"
-import { NotificationService } from "./services/NotificationService"
+import {
+  NotificationService,
+  CANCEL_FUTURE_ACTION,
+} from "./services/NotificationService"
 //import { AuthenticationService } from './services/AuthenticationService';
 import { PasscodeModal } from "./components/PasscodeModal"
 import { TransactionsProvider } from "./context/TransactionsContext"
@@ -46,25 +50,47 @@ function AppContent() {
   // Handle notification actions; registered synchronously so the cleanup runs
   useEffect(() => {
     const notificationService = NotificationService.getInstance()
-    const responseListener =
-      notificationService.addNotificationResponseListener(async (response) => {
-        const { actionIdentifier, notification } = response
-        const { data } = notification.request.content
+    // The same tap can arrive both via the listener and as the last response
+    const handledResponses = new Set<string>()
 
-        if (
-          actionIdentifier === "CANCEL_FUTURE" &&
-          typeof data?.identifier === "string"
-        ) {
-          try {
-            await notificationService.cancelFutureOccurrences(
-              data.selected as string,
-              data.identifier
-            )
-          } catch (error) {
-            console.error("Error cancelling future occurrences:", error)
-          }
+    const handleResponse = async (
+      response: Notifications.NotificationResponse
+    ) => {
+      const { actionIdentifier, notification } = response
+      const { data } = notification.request.content
+      const responseKey = `${notification.request.identifier}-${notification.date}-${actionIdentifier}`
+      if (handledResponses.has(responseKey)) return
+      handledResponses.add(responseKey)
+
+      if (
+        actionIdentifier === CANCEL_FUTURE_ACTION &&
+        typeof data?.identifier === "string" &&
+        (data.table === "income" || data.table === "expenses") &&
+        typeof data.name === "string" &&
+        typeof data.recurringDay === "string"
+      ) {
+        try {
+          await stopRecurringByName(data.table, data.name, data.recurringDay)
+          await notificationService.cancelFutureOccurrences(
+            data.name,
+            data.identifier
+          )
+        } catch (error) {
+          console.error("Error cancelling future occurrences:", error)
         }
-      })
+      }
+    }
+
+    const responseListener =
+      notificationService.addNotificationResponseListener(handleResponse)
+
+    // A tap that launched the app from a closed state may arrive before the
+    // listener exists; handle it once, then clear it so it isn't re-handled
+    const lastResponse = Notifications.getLastNotificationResponse()
+    if (lastResponse) {
+      Notifications.clearLastNotificationResponse()
+      handleResponse(lastResponse)
+    }
 
     return () => {
       notificationService.removeNotificationListener(responseListener)

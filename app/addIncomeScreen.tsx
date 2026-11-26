@@ -84,7 +84,12 @@ export default function AddIncomeScreen() {
             `Your recurring income of NGN${numAmount.toLocaleString()} from ${source} is due next on ${nextDate.toLocaleDateString()}`,
             nextDate,
             `recurring-income-${source}-${recurringDate}`,
-            source
+            source,
+            {
+              table: "income",
+              name: source.trim(),
+              recurringDay: recurringDate,
+            }
           )
         }
 

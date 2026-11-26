@@ -639,6 +639,22 @@ export const deleteExpense = async (key: number): Promise<boolean> => {
   )
 }
 
+// Stop a recurring income or expense from being added again in future months
+export const stopRecurring = async (
+  table: "income" | "expenses",
+  id: number
+): Promise<boolean> => {
+  return (
+    (await safeDatabaseOperation(async (db) => {
+      await db.runAsync(
+        `UPDATE ${table} SET is_recurring = 0, recurring_date = NULL WHERE id = ?;`,
+        [id]
+      )
+      return true
+    })) || false
+  )
+}
+
 export const handleRecurringUpdates = async () => {
   const today = new Date()
   const currentDay = today.getDate()

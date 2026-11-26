@@ -14,6 +14,7 @@ import {
 } from "react-native"
 import { useRouter } from "expo-router"
 import { useBudget } from "./context/BudgetContext"
+import { stopRecurring } from "./database"
 import { NotificationService } from "./services/NotificationService"
 import { clearIncomeTable } from "./database"
 import ConfirmationModal from "./components/ConfirmationModal"
@@ -176,6 +177,11 @@ export default function AddIncomeScreen() {
     if (!selectedIncome) return
 
     try {
+      // Clear the recurring flag so no further occurrences are recorded
+      const stopped = await stopRecurring("income", selectedIncome.id)
+      if (!stopped) throw new Error("Failed to stop recurring income")
+      await refreshData()
+
       const notificationService = NotificationService.getInstance()
       await notificationService.cancelFutureOccurrences(
         selectedIncome.source,

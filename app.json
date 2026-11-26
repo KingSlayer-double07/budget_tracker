@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "myapp",
+    "scheme": "budgettracker",
     "userInterfaceStyle": "automatic",
     "platforms": [
       "ios",
@@ -15,12 +15,11 @@
       "supportsTablet": true,
       "infoPlist": {
         "UIBackgroundModes": [
-          "remote-notification",
           "remote-notification"
         ],
         "ITSAppUsesNonExemptEncryption": false
       },
-      "bundleIdentifier": "budget-tracker"
+      "bundleIdentifier": "com.kingslayer_double07.budget_tracker"
     },
     "android": {
       "adaptiveIcon": {

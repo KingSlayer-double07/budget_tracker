@@ -43,6 +43,34 @@ function AppContent() {
     initializeApp()
   }, [])
 
+  // Handle notification actions; registered synchronously so the cleanup runs
+  useEffect(() => {
+    const notificationService = NotificationService.getInstance()
+    const responseListener =
+      notificationService.addNotificationResponseListener(async (response) => {
+        const { actionIdentifier, notification } = response
+        const { data } = notification.request.content
+
+        if (
+          actionIdentifier === "CANCEL_FUTURE" &&
+          typeof data?.identifier === "string"
+        ) {
+          try {
+            await notificationService.cancelFutureOccurrences(
+              data.selected as string,
+              data.identifier
+            )
+          } catch (error) {
+            console.error("Error cancelling future occurrences:", error)
+          }
+        }
+      })
+
+    return () => {
+      notificationService.removeNotificationListener(responseListener)
+    }
+  }, [])
+
   // Handle app state changes
   useEffect(() => {
     const subscription = AppState.addEventListener(
@@ -72,32 +100,8 @@ function AppContent() {
       const notificationService = NotificationService.getInstance()
       await notificationService.initialize()
 
-      const responseListener =
-        notificationService.addNotificationResponseListener(
-          async (response) => {
-            const { actionIdentifier, notification } = response
-            const { data } = notification.request.content
-
-            if (actionIdentifier === "CANCEL_FUTURE" && typeof data?.identifier === 'string') {
-              try {
-                await notificationService.cancelFutureOccurrences(
-                  data.selected as string,
-                  data.identifier
-                )
-              } catch (error) {
-                console.error("Error cancelling future occurrences:", error)
-              }
-            }
-          }
-        )
-
       // Initial authentication check
       await handleAuthentication()
-
-      // Cleanup listeners on unmount
-      return () => {
-        notificationService.removeNotificationListener(responseListener)
-      }
     } catch (error) {
       console.error("Error initializing app:", error)
     } finally {

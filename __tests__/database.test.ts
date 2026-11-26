@@ -363,3 +363,112 @@ describe("getNextDueDate", () => {
     )
   })
 })
+
+describe("expense categories", () => {
+  const categoryId = async (name: string) =>
+    (await database.getCategories()).find((c) => c.name === name)!.id
+
+  it("starts with the default categories", async () => {
+    const names = (await database.getCategories()).map((c) => c.name)
+    expect(names.sort()).toEqual([...database.DEFAULT_CATEGORIES].sort())
+  })
+
+  it("does not bring back removed defaults on the next start", async () => {
+    await database.deleteCategory(await categoryId("Health"))
+
+    // Restart the module against the same database
+    const db = await database.getDatabase()
+    jest.resetModules()
+    require("expo-sqlite").openDatabaseAsync.mockResolvedValueOnce(db)
+    const restarted: Database = require("../app/database")
+    await restarted.initializeDatabase()
+
+    const names = (await restarted.getCategories()).map((c) => c.name)
+    expect(names).not.toContain("Health")
+    expect(names).toHaveLength(database.DEFAULT_CATEGORIES.length - 1)
+  })
+
+  it("adds and renames categories, rejecting duplicates", async () => {
+    expect(await database.addCategory("  Church ")).toBe(true)
+    expect(await database.addCategory("church")).toBe(false)
+    expect(await database.addCategory("Uncategorized")).toBe(false)
+    expect(await database.addCategory("   ")).toBe(false)
+
+    const church = await categoryId("Church")
+    expect(await database.renameCategory(church, "Transport")).toBe(false)
+    expect(await database.renameCategory(church, "Tithe & Offering")).toBe(true)
+    // Renaming to a different case of its own name is allowed
+    const tithe = await categoryId("Tithe & Offering")
+    expect(await database.renameCategory(tithe, "tithe & offering")).toBe(true)
+    expect(alertSpy).toHaveBeenCalledTimes(4)
+  })
+
+  it("saves the category with an expense and shows its name", async () => {
+    const transport = await categoryId("Transport")
+    await database.addExpense("Bolt ride", 3500, false, "", transport)
+    await database.addExpense("Snacks", 1200, false, "")
+
+    const expenses = await database.getExpenses()
+    expect(expenses).toEqual([
+      expect.objectContaining({ item: "Snacks", category_name: null }),
+      expect.objectContaining({
+        item: "Bolt ride",
+        category_id: transport,
+        category_name: "Transport",
+      }),
+    ])
+  })
+
+  it("changes an expense's category and makes it Uncategorized", async () => {
+    await database.addExpense("Bolt ride", 3500, false, "")
+    const [expense] = await allRows("expenses")
+
+    await database.setExpenseCategory(expense.id, await categoryId("Transport"))
+    expect((await allRows("expenses"))[0].category_id).toBe(
+      await categoryId("Transport")
+    )
+
+    await database.setExpenseCategory(expense.id, null)
+    expect((await allRows("expenses"))[0].category_id).toBeNull()
+  })
+
+  it("makes a removed category's expenses Uncategorized", async () => {
+    const food = await categoryId("Food & Groceries")
+    await database.addExpense("Market", 20000, false, "", food)
+    await database.deleteCategory(food)
+
+    expect((await allRows("expenses"))[0].category_id).toBeNull()
+    expect((await database.getCategories()).map((c) => c.id)).not.toContain(
+      food
+    )
+  })
+
+  it("keeps the category on recurring occurrences", async () => {
+    const bills = await categoryId("Utilities & Bills")
+    setToday(new Date(2026, 9, 10, 9))
+    await database.addExpense("Electricity", 25000, true, "15", bills)
+
+    setToday(new Date(2026, 9, 15, 9))
+    await database.handleRecurringUpdates()
+
+    const expenses = await allRows("expenses")
+    expect(expenses).toHaveLength(2)
+    expect(expenses[1]).toMatchObject({ date: "2026-10-15", category_id: bills })
+  })
+
+  it("totals this month's spending by category, largest first", async () => {
+    const food = await categoryId("Food & Groceries")
+    const transport = await categoryId("Transport")
+    await insertExpense("Last month", 99000, "2026-10-20")
+    await database.addExpense("Market", 20000, false, "", food)
+    await database.addExpense("Restaurant", 15000, false, "", food)
+    await database.addExpense("Bolt", 5000, false, "", transport)
+    await database.addExpense("Misc", 8000, false, "")
+
+    expect(await database.getMonthlyExpensesByCategory()).toEqual([
+      { categoryId: food, name: "Food & Groceries", total: 35000 },
+      { categoryId: null, name: "Uncategorized", total: 8000 },
+      { categoryId: transport, name: "Transport", total: 5000 },
+    ])
+  })
+})

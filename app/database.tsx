@@ -23,7 +23,31 @@ interface Expense {
   is_recurring: number
   recurring_date: string | null
   last_processed: string | null
+  category_id: number | null
 }
+
+export interface Category {
+  id: number
+  name: string
+}
+
+// Starting categories, created the first time the app runs
+export const DEFAULT_CATEGORIES = [
+  "Food & Groceries",
+  "Transport",
+  "Rent & Housing",
+  "Utilities & Bills",
+  "Data & Airtime",
+  "Health",
+  "Entertainment",
+  "Shopping",
+  "Family & Gifts",
+  "Savings & Investments",
+  "Other",
+]
+
+// Label for expenses without a category
+export const UNCATEGORIZED = "Uncategorized"
 
 interface PlannedPurchase {
   id: number
@@ -240,6 +264,31 @@ export const initializeDatabase = async (): Promise<boolean> => {
       }
     }
 
+    // Expense categories; the defaults are only added when the table is first
+    // created, so categories removed later stay removed
+    const categoriesTable = await db.getFirstAsync(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'categories'"
+    )
+    if (!categoriesTable) {
+      await db.execAsync(`
+        CREATE TABLE categories (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL UNIQUE COLLATE NOCASE
+        );
+      `)
+      for (const name of DEFAULT_CATEGORIES) {
+        await db.runAsync("INSERT INTO categories (name) VALUES (?)", [name])
+      }
+    }
+
+    // Existing expenses have no category (shown as Uncategorized)
+    const categoryColumn = await db.getFirstAsync(
+      "SELECT name FROM pragma_table_info('expenses') WHERE name = 'category_id'"
+    )
+    if (!categoryColumn) {
+      await db.execAsync("ALTER TABLE expenses ADD COLUMN category_id INTEGER;")
+    }
+
     isInitialized = true
     return true
   } catch (error) {
@@ -358,7 +407,9 @@ export const getExpenses = async () => {
   return (
     (await safeDatabaseOperation(async (db) => {
       const results = await db.getAllAsync(
-        `SELECT * FROM expenses ORDER BY date DESC;`
+        `SELECT e.*, c.name AS category_name FROM expenses e
+         LEFT JOIN categories c ON c.id = e.category_id
+         ORDER BY e.date DESC, e.id DESC;`
       )
       return results
     })) || []
@@ -584,7 +635,8 @@ export const addExpense = async (
   item: string,
   amount: number,
   isRecurring: boolean,
-  recurringDate: string
+  recurringDate: string,
+  categoryId: number | null = null
 ): Promise<boolean> => {
   // Validate inputs
   const itemValidation = validateString(item, "Item name")
@@ -613,8 +665,15 @@ export const addExpense = async (
       const recurringDates = isRecurring ? recurringDate : null
 
       await db.runAsync(
-        "INSERT INTO expenses (item, amount, date, is_recurring, recurring_date) VALUES (?, ?, ?, ?, ?)",
-        [item.trim(), amount, date, isRecurring ? 1 : 0, recurringDates]
+        "INSERT INTO expenses (item, amount, date, is_recurring, recurring_date, category_id) VALUES (?, ?, ?, ?, ?, ?)",
+        [
+          item.trim(),
+          amount,
+          date,
+          isRecurring ? 1 : 0,
+          recurringDates,
+          categoryId,
+        ]
       )
 
       return true
@@ -756,11 +815,19 @@ const processRecurringTable = async (
     }
 
     for (const due of dueDatesBetween(dayOfMonth, after, today)) {
-      // Occurrences are plain entries so only the original keeps recurring
-      await database.runAsync(
-        `INSERT INTO ${table} (${nameColumn}, amount, date, is_recurring, recurring_date) VALUES (?, ?, ?, 0, NULL)`,
-        [name, entry.amount, due]
-      )
+      // Occurrences are plain entries so only the original keeps recurring;
+      // expense occurrences keep the original's category
+      if (table === "expenses") {
+        await database.runAsync(
+          "INSERT INTO expenses (item, amount, date, is_recurring, recurring_date, category_id) VALUES (?, ?, ?, 0, NULL, ?)",
+          [name, entry.amount, due, entry.category_id ?? null]
+        )
+      } else {
+        await database.runAsync(
+          "INSERT INTO income (source, amount, date, is_recurring, recurring_date) VALUES (?, ?, ?, 0, NULL)",
+          [name, entry.amount, due]
+        )
+      }
     }
 
     await database.runAsync(
@@ -779,6 +846,145 @@ export const handleRecurringUpdates = async () => {
   } catch (error) {
     console.error("Error processing recurring updates:", error)
   }
+}
+
+export const getCategories = async (): Promise<Category[]> => {
+  return (
+    (await safeDatabaseOperation((db) =>
+      db.getAllAsync<Category>(
+        "SELECT id, name FROM categories ORDER BY name COLLATE NOCASE"
+      )
+    )) || []
+  )
+}
+
+// Check a category name is present and not already used (ignoring case)
+const validateCategoryName = async (
+  db: SQLite.SQLiteDatabase,
+  name: string,
+  exceptId?: number
+): Promise<ValidationResult> => {
+  const validation = validateString(name, "Category name", 40)
+  if (!validation.isValid) return validation
+  if (name.trim().toLowerCase() === UNCATEGORIZED.toLowerCase()) {
+    return { isValid: false, error: `"${UNCATEGORIZED}" is reserved` }
+  }
+  const existing = await db.getFirstAsync<Category>(
+    "SELECT id FROM categories WHERE name = ? COLLATE NOCASE AND id != ?",
+    [name.trim(), exceptId ?? -1]
+  )
+  if (existing) {
+    return { isValid: false, error: `"${name.trim()}" already exists` }
+  }
+  return { isValid: true }
+}
+
+export const addCategory = async (name: string): Promise<boolean> => {
+  return (
+    (await safeDatabaseOperation(async (db) => {
+      const validation = await validateCategoryName(db, name)
+      if (!validation.isValid) {
+        Alert.alert("Validation Error", validation.error)
+        return false
+      }
+      await db.runAsync("INSERT INTO categories (name) VALUES (?)", [
+        name.trim(),
+      ])
+      return true
+    })) || false
+  )
+}
+
+export const renameCategory = async (
+  id: number,
+  name: string
+): Promise<boolean> => {
+  return (
+    (await safeDatabaseOperation(async (db) => {
+      const validation = await validateCategoryName(db, name, id)
+      if (!validation.isValid) {
+        Alert.alert("Validation Error", validation.error)
+        return false
+      }
+      await db.runAsync("UPDATE categories SET name = ? WHERE id = ?", [
+        name.trim(),
+        id,
+      ])
+      return true
+    })) || false
+  )
+}
+
+// Remove a category; its expenses become Uncategorized
+export const deleteCategory = async (id: number): Promise<boolean> => {
+  return (
+    (await safeDatabaseOperation(async (db) => {
+      await db.execAsync("BEGIN TRANSACTION")
+      try {
+        await db.runAsync(
+          "UPDATE expenses SET category_id = NULL WHERE category_id = ?",
+          [id]
+        )
+        await db.runAsync("DELETE FROM categories WHERE id = ?", [id])
+        await db.execAsync("COMMIT")
+        return true
+      } catch (error) {
+        await db.execAsync("ROLLBACK")
+        throw error
+      }
+    })) || false
+  )
+}
+
+// Change an expense's category; null makes it Uncategorized
+export const setExpenseCategory = async (
+  expenseId: number,
+  categoryId: number | null
+): Promise<boolean> => {
+  return (
+    (await safeDatabaseOperation(async (db) => {
+      await db.runAsync("UPDATE expenses SET category_id = ? WHERE id = ?", [
+        categoryId,
+        expenseId,
+      ])
+      return true
+    })) || false
+  )
+}
+
+export interface CategoryTotal {
+  categoryId: number | null
+  name: string
+  total: number
+}
+
+// Spending per category in the given month (defaults to the current month),
+// largest first; expenses without a category are grouped as Uncategorized
+export const getMonthlyExpensesByCategory = async (
+  month: Date = new Date()
+): Promise<CategoryTotal[]> => {
+  const monthPrefix = toLocalDateString(month).slice(0, 7) // YYYY-MM
+  const rows =
+    (await safeDatabaseOperation((db) =>
+      db.getAllAsync<{
+        category_id: number | null
+        name: string | null
+        total: number
+      }>(
+        `SELECT c.id AS category_id, c.name AS name, SUM(e.amount) AS total
+         FROM expenses e
+         LEFT JOIN categories c ON c.id = e.category_id
+         WHERE e.date LIKE ?
+         GROUP BY c.id
+         ORDER BY total DESC`,
+        [`${monthPrefix}%`]
+      )
+    )) || []
+  return rows.map((row) => ({
+    categoryId: row.category_id,
+    name: row.name ?? UNCATEGORIZED,
+    total: row.total,
+  }))
 }
 
 export const clearIncomeTable = async (): Promise<boolean> => {

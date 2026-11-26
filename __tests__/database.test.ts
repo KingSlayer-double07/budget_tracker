@@ -231,12 +231,82 @@ describe("recurring transactions", () => {
     expect(await allRows("income")).toHaveLength(1)
   })
 
-  it("skips entries that are not due today", async () => {
-    setToday(new Date(2026, 9, 10, 9))
-    await database.addIncome("Salary", 300000, true, "25")
+  it("catches up on due dates missed while the app was closed", async () => {
+    setToday(new Date(2026, 7, 10, 9)) // set up on 10 Aug, due on the 26th
+    await database.addIncome("Salary", 300000, true, "26")
+
+    setToday(new Date(2026, 10, 30, 9)) // first opened again on 30 Nov
+    await database.handleRecurringUpdates()
+    await database.handleRecurringUpdates()
+
+    const dates = (await allRows("income")).map((row) => row.date)
+    expect(dates).toEqual([
+      "2026-08-10",
+      "2026-08-26",
+      "2026-09-26",
+      "2026-10-26",
+      "2026-11-26",
+    ])
+  })
+
+  it("does not add the next occurrence before its due day", async () => {
+    setToday(new Date(2026, 9, 26, 9))
+    await database.addExpense("Rent", 150000, true, "28")
+    await database.handleRecurringUpdates()
+    expect((await allRows("expenses")).map((row) => row.date)).toEqual([
+      "2026-10-26",
+    ])
+  })
+
+  it("uses the last day of shorter months for days 29-31", async () => {
+    setToday(new Date(2026, 9, 15, 9))
+    await database.addExpense("Rent", 150000, true, "31")
+
+    setToday(new Date(2027, 2, 1, 9)) // 1 Mar 2027
+    await database.handleRecurringUpdates()
+
+    const dates = (await allRows("expenses")).map((row) => row.date)
+    expect(dates).toEqual([
+      "2026-10-15",
+      "2026-10-31",
+      "2026-11-30",
+      "2026-12-31",
+      "2027-01-31",
+      "2027-02-28",
+    ])
+  })
+
+  it("does not bring back an occurrence that was deleted", async () => {
+    setToday(new Date(2026, 9, 1, 9))
+    await database.addExpense("Gym", 15000, true, "5")
+    setToday(new Date(2026, 9, 5, 9))
+    await database.handleRecurringUpdates()
+
+    const occurrence = (await allRows("expenses"))[1]
+    expect(occurrence.date).toBe("2026-10-05")
+    await database.deleteExpense(occurrence.id)
+
+    setToday(new Date(2026, 9, 20, 9))
+    await database.handleRecurringUpdates()
+    expect(await allRows("expenses")).toHaveLength(1)
+  })
+
+  it("continues after the latest recorded occurrence for existing entries", async () => {
+    // Data from before progress was tracked: an occurrence already recorded
+    // on 26 Oct, but nothing for September
+    const db = await database.getDatabase()
+    await db.runAsync(
+      "INSERT INTO income (source, amount, date, is_recurring, recurring_date) VALUES ('Salary', 300000, '2026-08-01', 1, '26')"
+    )
+    await db.runAsync(
+      "INSERT INTO income (source, amount, date) VALUES ('Salary', 300000, '2026-10-26')"
+    )
+
     setToday(new Date(2026, 10, 26, 9))
     await database.handleRecurringUpdates()
-    expect(await allRows("income")).toHaveLength(1)
+
+    const dates = (await allRows("income")).map((row) => row.date)
+    expect(dates).toEqual(["2026-08-01", "2026-10-26", "2026-11-26"])
   })
 
   it("stops recurring by id", async () => {

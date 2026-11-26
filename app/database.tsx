@@ -12,6 +12,7 @@ interface Income {
   date: string
   is_recurring: number
   recurring_date: string | null
+  last_processed: string | null
 }
 
 interface Expense {
@@ -21,6 +22,7 @@ interface Expense {
   date: string
   is_recurring: number
   recurring_date: string | null
+  last_processed: string | null
 }
 
 interface PlannedPurchase {
@@ -225,6 +227,17 @@ export const initializeDatabase = async (): Promise<boolean> => {
       await db.execAsync(`
         ALTER TABLE planned_purchases ADD COLUMN due_date TEXT;
       `)
+    }
+
+    // Track how far each recurring entry has been processed, so missed due
+    // dates can be caught up without re-adding deleted occurrences
+    for (const table of ["income", "expenses"]) {
+      const column = await db.getFirstAsync(
+        `SELECT name FROM pragma_table_info('${table}') WHERE name = 'last_processed'`
+      )
+      if (!column) {
+        await db.execAsync(`ALTER TABLE ${table} ADD COLUMN last_processed TEXT;`)
+      }
     }
 
     isInitialized = true
@@ -675,66 +688,86 @@ export const stopRecurringByName = async (
   )
 }
 
-export const handleRecurringUpdates = async () => {
-  const today = new Date()
-  const currentDay = today.getDate()
-  const todayString = toLocalDateString(today)
+// Due dates of a monthly recurring entry after `after` up to and including
+// `today` (both YYYY-MM-DD). Days past the end of a month (29-31) fall on
+// that month's last day.
+const dueDatesBetween = (
+  dayOfMonth: number,
+  after: string,
+  today: string
+): string[] => {
+  const dates: string[] = []
+  let [year, month] = after.split("-").map(Number)
+  const [endYear, endMonth] = today.split("-").map(Number)
+  while (year < endYear || (year === endYear && month <= endMonth)) {
+    const daysInMonth = new Date(year, month, 0).getDate()
+    const due = toLocalDateString(
+      new Date(year, month - 1, Math.min(dayOfMonth, daysInMonth))
+    )
+    if (due > after && due <= today) dates.push(due)
+    month++
+    if (month > 12) {
+      month = 1
+      year++
+    }
+  }
+  return dates
+}
 
-  // Process recurring income
+// Record every occurrence of the recurring entries in one table that has
+// fallen due since it was last processed, including days the app was closed
+const processRecurringTable = async (
+  database: SQLite.SQLiteDatabase,
+  table: "income" | "expenses",
+  today: string
+) => {
+  const nameColumn = table === "income" ? "source" : "item"
+  const entries = await database.getAllAsync<Income & Expense>(
+    `SELECT * FROM ${table} WHERE is_recurring = 1`
+  )
+
+  for (const entry of entries) {
+    const dayOfMonth = parseInt(entry.recurring_date ?? "")
+    if (isNaN(dayOfMonth)) continue
+    const name = (entry as any)[nameColumn] as string
+
+    // Continue from the last processed date; for entries created before that
+    // was tracked, from the latest occurrence already recorded
+    let after = (entry.last_processed ?? entry.date).slice(0, 10)
+    if (!entry.last_processed) {
+      const latest = await database.getFirstAsync<{ date: string | null }>(
+        `SELECT MAX(substr(date, 1, 10)) as date FROM ${table}
+         WHERE ${nameColumn} = ? AND amount = ? AND id != ? AND is_recurring = 0`,
+        [name, entry.amount, entry.id]
+      )
+      if (latest?.date && latest.date > after) after = latest.date
+    }
+
+    for (const due of dueDatesBetween(dayOfMonth, after, today)) {
+      // Occurrences are plain entries so only the original keeps recurring
+      await database.runAsync(
+        `INSERT INTO ${table} (${nameColumn}, amount, date, is_recurring, recurring_date) VALUES (?, ?, ?, 0, NULL)`,
+        [name, entry.amount, due]
+      )
+    }
+
+    await database.runAsync(
+      `UPDATE ${table} SET last_processed = ? WHERE id = ?`,
+      [today, entry.id]
+    )
+  }
+}
+
+export const handleRecurringUpdates = async () => {
+  const today = toLocalDateString(new Date())
   try {
     if (!db) return
-    const recurringIncome = await db.getAllAsync<Income>(
-      "SELECT * FROM income WHERE is_recurring = 1"
-    )
-    for (const income of recurringIncome) {
-      if (
-        income.recurring_date &&
-        parseInt(income.recurring_date) === currentDay
-      ) {
-        // Skip if this occurrence has already been recorded today
-        const alreadyAdded = await db.getFirstAsync(
-          "SELECT id FROM income WHERE source = ? AND amount = ? AND date = ?",
-          [income.source, income.amount, todayString]
-        )
-        if (alreadyAdded) continue
-
-        // Occurrences are plain entries so only the original keeps recurring
-        await db.runAsync(
-          "INSERT INTO income (amount, source, date, is_recurring, recurring_date) VALUES (?, ?, ?, 0, NULL)",
-          [income.amount, income.source, todayString]
-        )
-      }
-    }
-
-    // Process recurring expenses
-    if (!db) return
-    const recurringExpenses = await db.getAllAsync<Expense>(
-      "SELECT * FROM expenses WHERE is_recurring = 1"
-    )
-    for (const expense of recurringExpenses) {
-      if (
-        expense.recurring_date &&
-        parseInt(expense.recurring_date) === currentDay
-      ) {
-        // Skip if this occurrence has already been recorded today
-        const alreadyAdded = await db.getFirstAsync(
-          "SELECT id FROM expenses WHERE item = ? AND amount = ? AND date = ?",
-          [expense.item, expense.amount, todayString]
-        )
-        if (alreadyAdded) continue
-
-        // Occurrences are plain entries so only the original keeps recurring
-        await db.runAsync(
-          "INSERT INTO expenses (amount, item, date, is_recurring, recurring_date) VALUES (?, ?, ?, 0, NULL)",
-          [expense.amount, expense.item, todayString]
-        )
-      }
-    }
+    await processRecurringTable(db, "income", today)
+    await processRecurringTable(db, "expenses", today)
   } catch (error) {
     console.error("Error processing recurring updates:", error)
   }
 }
-
 
 export const clearIncomeTable = async (): Promise<boolean> => {
   return (

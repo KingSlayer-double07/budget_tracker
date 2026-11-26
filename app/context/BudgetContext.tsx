@@ -22,6 +22,14 @@ import {
   deleteExpense,
   handleRecurringUpdates,
   checkBudgetThreshold,
+  getCategories,
+  getMonthlyExpensesByCategory,
+  addCategory,
+  renameCategory,
+  deleteCategory,
+  setExpenseCategory,
+  Category,
+  CategoryTotal,
 } from "../database"
 
 interface BudgetContextType {
@@ -31,6 +39,9 @@ interface BudgetContextType {
   incomeList: any[]
   expenseList: any[]
   plannedPurchases: any[]
+  categories: Category[]
+  // This month's spending per category, largest first
+  categoryTotals: CategoryTotal[]
   isLoading: boolean
   error: string | null
   refreshData: () => Promise<void>
@@ -44,7 +55,8 @@ interface BudgetContextType {
     item: string,
     amount: number,
     isRecurring: boolean,
-    recurringDate: string
+    recurringDate: string,
+    categoryId?: number | null
   ) => Promise<boolean>
   addNewPlannedPurchase: (
     item: string,
@@ -56,6 +68,13 @@ interface BudgetContextType {
   deletePlannedPurchase: (id: number) => Promise<boolean>
   deleteSelectedIncome: (id: number) => Promise<boolean>
   deleteSelectedExpense: (id: number) => Promise<boolean>
+  addNewCategory: (name: string) => Promise<boolean>
+  renameExistingCategory: (id: number, name: string) => Promise<boolean>
+  removeCategory: (id: number) => Promise<boolean>
+  changeExpenseCategory: (
+    expenseId: number,
+    categoryId: number | null
+  ) => Promise<boolean>
 }
 
 const BudgetContext = createContext<BudgetContextType | undefined>(undefined)
@@ -69,6 +88,8 @@ export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({
   const [incomeList, setIncomeList] = useState<any[]>([])
   const [expenseList, setExpenseList] = useState<any[]>([])
   const [plannedPurchases, setPlannedPurchases] = useState<any[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [categoryTotals, setCategoryTotals] = useState<CategoryTotal[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -85,6 +106,8 @@ export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({
         incomeTotal,
         expensesTotal,
         currentBalance,
+        categoryList,
+        monthlyCategoryTotals,
       ] = await Promise.all([
         getIncome(),
         getExpenses(),
@@ -92,6 +115,8 @@ export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({
         getTotalIncome(),
         getTotalExpenses(),
         getBalance(),
+        getCategories(),
+        getMonthlyExpensesByCategory(),
       ])
 
       setIncomeList(income)
@@ -100,6 +125,8 @@ export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({
       setTotalIncome(incomeTotal)
       setTotalExpenses(expensesTotal)
       setBalance(currentBalance)
+      setCategories(categoryList)
+      setCategoryTotals(monthlyCategoryTotals)
 
       // Runs after every data change, so it covers manual, bought and recurring expenses
       await checkBudgetThreshold()
@@ -146,9 +173,16 @@ export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({
     item: string,
     amount: number,
     isRecurring: boolean,
-    recurringDate: string
+    recurringDate: string,
+    categoryId: number | null = null
   ): Promise<boolean> => {
-    const success = await addExpense(item, amount, isRecurring, recurringDate)
+    const success = await addExpense(
+      item,
+      amount,
+      isRecurring,
+      recurringDate,
+      categoryId
+    )
     if (success) {
       await fetchData()
     }
@@ -222,6 +256,22 @@ export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({
     return success
   }
 
+  // Run a database change and refresh everything if it succeeded
+  const refreshAfter = async (change: Promise<boolean>) => {
+    const success = await change
+    if (success) {
+      await fetchData()
+    }
+    return success
+  }
+
+  const addNewCategory = (name: string) => refreshAfter(addCategory(name))
+  const renameExistingCategory = (id: number, name: string) =>
+    refreshAfter(renameCategory(id, name))
+  const removeCategory = (id: number) => refreshAfter(deleteCategory(id))
+  const changeExpenseCategory = (expenseId: number, categoryId: number | null) =>
+    refreshAfter(setExpenseCategory(expenseId, categoryId))
+
   return (
     <BudgetContext.Provider
       value={{
@@ -231,6 +281,8 @@ export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({
         incomeList,
         expenseList,
         plannedPurchases,
+        categories,
+        categoryTotals,
         isLoading,
         error,
         refreshData: fetchData,
@@ -242,6 +294,10 @@ export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({
         deletePlannedPurchase,
         deleteSelectedIncome,
         deleteSelectedExpense,
+        addNewCategory,
+        renameExistingCategory,
+        removeCategory,
+        changeExpenseCategory,
       }}>
       {children}
     </BudgetContext.Provider>

@@ -13,10 +13,14 @@ import {
 } from "react-native"
 import { useRouter } from "expo-router"
 import { useBudget } from "./context/BudgetContext"
-import { stopRecurring, getNextDueDate } from "./database"
+import { stopRecurring, getNextDueDate, UNCATEGORIZED } from "./database"
 import { NotificationService } from "./services/NotificationService"
 import { clearExpensesTable } from "./database"
 import ConfirmationModal from "./components/ConfirmationModal"
+import {
+  CategoryChips,
+  CategoryPickerModal,
+} from "./components/CategoryPicker"
 import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable"
 
 export default function AddExpenseScreen() {
@@ -24,6 +28,13 @@ export default function AddExpenseScreen() {
   const [amount, setAmount] = useState("")
   const [isRecurring, setIsRecurring] = useState(false)
   const [recurringDate, setRecurringDate] = useState("")
+  const [categoryId, setCategoryId] = useState<number | null>(null)
+  // Expense whose category is being changed from the history list
+  const [recategorizing, setRecategorizing] = useState<{
+    id: number
+    item: string
+    category_id: number | null
+  } | null>(null)
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [selectedExpense, setSelectedExpense] = useState<{
     id: number
@@ -40,6 +51,8 @@ export default function AddExpenseScreen() {
     addNewExpense,
     refreshData,
     deleteSelectedExpense,
+    categories,
+    changeExpenseCategory,
   } = useBudget()
 
   const handleSaveExpense = async () => {
@@ -59,7 +72,8 @@ export default function AddExpenseScreen() {
         description,
         numAmount,
         isRecurring,
-        recurringDate
+        recurringDate,
+        categoryId
       )
       if (success) {
         // Schedule notification for recurring expense if date is provided
@@ -88,6 +102,7 @@ export default function AddExpenseScreen() {
         setDescription("")
         setAmount("")
         setRecurringDate("")
+        setCategoryId(null)
       } else {
         Alert.alert("Error", "Failed to add expense. Please try again.")
       }
@@ -194,6 +209,17 @@ export default function AddExpenseScreen() {
     }
   }
 
+  const handleChangeCategory = async (newCategoryId: number | null) => {
+    if (!recategorizing) return
+    const expense = recategorizing
+    setRecategorizing(null)
+    if (newCategoryId === expense.category_id) return
+    const success = await changeExpenseCategory(expense.id, newCategoryId)
+    if (!success) {
+      Alert.alert("Error", "Failed to change the category")
+    }
+  }
+
   const renderExpenseItem = ({
     item,
   }: {
@@ -203,6 +229,8 @@ export default function AddExpenseScreen() {
       amount: number
       is_recurring: boolean
       recurring_date: string | null
+      category_id: number | null
+      category_name: string | null
     }
   }) => (
     <Swipeable
@@ -211,10 +239,20 @@ export default function AddExpenseScreen() {
       overshootRight={true}>
       <Pressable
         style={styles.expenseItem}
+        onPress={() => setRecategorizing(item)}
         onLongPress={() => handleLongPress(item)}
         delayLongPress={500}>
         <View style={styles.expenseContent}>
-          <Text style={styles.expenseDescription}>{item.item}</Text>
+          <View style={styles.expenseHeader}>
+            <Text style={styles.expenseDescription}>{item.item}</Text>
+            <Text
+              style={[
+                styles.categoryTag,
+                !item.category_name && styles.categoryTagEmpty,
+              ]}>
+              {item.category_name ?? UNCATEGORIZED}
+            </Text>
+          </View>
           <Text style={styles.expenseAmount}>
             NGN{item.amount.toLocaleString()}
           </Text>
@@ -277,6 +315,14 @@ export default function AddExpenseScreen() {
             thumbColor={isRecurring ? "#043927" : "#f4f3f4"}
           />
         </View>
+        <Text style={styles.fieldLabel}>Category</Text>
+        <View style={styles.categoryPicker}>
+          <CategoryChips
+            categories={categories}
+            selectedId={categoryId}
+            onSelect={setCategoryId}
+          />
+        </View>
         {isRecurring && (
           <TextInput
             style={styles.input}
@@ -318,6 +364,15 @@ export default function AddExpenseScreen() {
           showsVerticalScrollIndicator={false}
         />
       </View>
+
+      <CategoryPickerModal
+        visible={recategorizing !== null}
+        title={`Category for "${recategorizing?.item ?? ""}"`}
+        categories={categories}
+        selectedId={recategorizing?.category_id ?? null}
+        onSelect={handleChangeCategory}
+        onCancel={() => setRecategorizing(null)}
+      />
 
       <ConfirmationModal
         visible={showCancelModal}
@@ -425,11 +480,39 @@ const styles = StyleSheet.create({
   expenseContent: {
     flexDirection: "column",
   },
+  expenseHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 8,
+  },
   expenseDescription: {
+    flex: 1,
     fontSize: 16,
     fontWeight: "bold",
     color: "#043927",
     marginBottom: 5,
+  },
+  categoryTag: {
+    fontSize: 12,
+    color: "#043927",
+    backgroundColor: "#e3efe9",
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  categoryTagEmpty: {
+    color: "#6c757d",
+    backgroundColor: "#eceff1",
+  },
+  fieldLabel: {
+    fontSize: 14,
+    color: "#555",
+    marginBottom: 6,
+  },
+  categoryPicker: {
+    marginBottom: 12,
   },
   expenseAmount: {
     fontSize: 16,

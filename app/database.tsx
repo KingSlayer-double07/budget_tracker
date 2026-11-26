@@ -225,11 +225,9 @@ export const initializeDatabase = async (): Promise<boolean> => {
       await db.execAsync(`
         ALTER TABLE planned_purchases ADD COLUMN due_date TEXT;
       `)
-      console.log("Added due_date column to planned_purchases table")
     }
 
     isInitialized = true
-    console.log("Database initialized successfully ✅")
     return true
   } catch (error) {
     console.error("Failed to initialize database:", error)
@@ -303,11 +301,6 @@ export const addPlannedPurchase = async (
       await db.runAsync(
         `INSERT INTO planned_purchases (item, amount, purchased, due_date) VALUES (?, ?, 0, ?);`,
         [item.trim(), amount, dueDate || null]
-      )
-      console.log(
-        `Planned purchase added: ${item} - ${amount}${
-          dueDate ? ` (Due: ${dueDate})` : ""
-        }`
       )
       return true
     })) || false
@@ -423,7 +416,6 @@ export const changePurchaseAmount = async (
 
       if (!result) {
         Alert.alert("Error", "Purchase not found")
-        console.log(`No Purchase found for id ${id} and item ${item}`)
         return false
       }
 
@@ -432,7 +424,6 @@ export const changePurchaseAmount = async (
           "Already Bought",
           "This item has already been marked as bought. \n Its amount can no longer be edited"
         )
-        console.log(`The item ${item} has already been marked as bought`)
         return false
       }
 
@@ -447,11 +438,9 @@ export const changePurchaseAmount = async (
         )
 
         await db.execAsync("COMMIT")
-        console.log(
-        `Planned purchase edited: ${result.item} ; previous amount - ${result.amount}  new amount - ${newAmount}`)
         return true
       } catch (error) {
-        console.log(error)
+        console.error(error)
         await db.execAsync("ROLLBACK")
         throw error
       }
@@ -525,7 +514,6 @@ export const addIncome = async (
         [source.trim(), amount, date, isRecurring ? 1 : 0, recurringDates]
       )
 
-      console.log(`Income added: ${source}, ${amount}`)
       return true
     })) || false
   )
@@ -585,7 +573,6 @@ export const addExpense = async (
         }
       }
 
-      console.log(`Expense added: ${item}, ${amount}`)
       return true
     })) || false
   )
@@ -596,7 +583,6 @@ export const deletePurchase = async (key: number): Promise<boolean> => {
     (await safeDatabaseOperation(async (db) => {
       await db.runAsync(`DELETE FROM planned_purchases WHERE id = ?;`, [key])
       await delay(100) // Add a small delay
-      console.log(`Purchase with ID ${key} deleted successfully`)
       return true
     })) || false
   )
@@ -607,7 +593,6 @@ export const deleteIncome = async (key: number): Promise<boolean> => {
     (await safeDatabaseOperation(async (db) => {
       await db.runAsync(`DELETE FROM income WHERE id = ?;`, [key])
       await delay(100) // Add a small delay
-      console.log(`Income with ID ${key} deleted successfully`)
       return true
     })) || false
   )
@@ -618,7 +603,6 @@ export const deleteExpense = async (key: number): Promise<boolean> => {
     (await safeDatabaseOperation(async (db) => {
       await db.runAsync(`DELETE FROM expenses WHERE id = ?;`, [key])
       await delay(100) // Add a small delay
-      console.log(`Expense with ID ${key} deleted successfully`)
       return true
     })) || false
   )

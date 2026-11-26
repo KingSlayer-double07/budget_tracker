@@ -338,3 +338,28 @@ describe("recurring transactions", () => {
     expect(sources).toEqual(["Salary", "Rental income", "Rental income"])
   })
 })
+
+describe("getNextDueDate", () => {
+  const at = (y: number, m: number, d: number, h = 12) => new Date(y, m - 1, d, h)
+
+  it("returns this month's due date when it hasn't passed", () => {
+    expect(database.getNextDueDate(28, at(2026, 11, 26))).toEqual(
+      at(2026, 11, 28, 7)
+    )
+  })
+
+  it("moves to next month once the due time has passed", () => {
+    expect(database.getNextDueDate(26, at(2026, 11, 26))).toEqual(
+      at(2026, 12, 26, 7)
+    )
+  })
+
+  it("uses the last day of shorter months instead of rolling over", () => {
+    expect(database.getNextDueDate(31, at(2026, 11, 2))).toEqual(
+      at(2026, 11, 30, 7)
+    )
+    expect(database.getNextDueDate(31, at(2027, 1, 31, 8))).toEqual(
+      at(2027, 2, 28, 7)
+    )
+  })
+})

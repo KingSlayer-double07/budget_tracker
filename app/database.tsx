@@ -714,6 +714,18 @@ const dueDatesBetween = (
   return dates
 }
 
+// The next due date (at 7:00) of an entry recurring on `dayOfMonth`, from
+// `from` onwards. Days past the end of a month fall on its last day.
+export const getNextDueDate = (dayOfMonth: number, from: Date = new Date()) => {
+  for (let offset = 0; ; offset++) {
+    const year = from.getFullYear()
+    const month = from.getMonth() + offset
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    const due = new Date(year, month, Math.min(dayOfMonth, daysInMonth), 7)
+    if (due >= from) return due
+  }
+}
+
 // Record every occurrence of the recurring entries in one table that has
 // fallen due since it was last processed, including days the app was closed
 const processRecurringTable = async (

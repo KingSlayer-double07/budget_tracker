@@ -13,7 +13,7 @@ import {
 } from "react-native"
 import { useRouter } from "expo-router"
 import { useBudget } from "./context/BudgetContext"
-import { stopRecurring } from "./database"
+import { stopRecurring, getNextDueDate } from "./database"
 import { NotificationService } from "./services/NotificationService"
 import { clearExpensesTable } from "./database"
 import ConfirmationModal from "./components/ConfirmationModal"
@@ -67,15 +67,8 @@ export default function AddExpenseScreen() {
           const notificationService = NotificationService.getInstance()
           const day = parseInt(recurringDate)
 
-          // Create a date for the next occurrence
-          const nextDate = new Date()
-          nextDate.setDate(day)
-          nextDate.setHours(7, 0, 0, 0) // Set to 7:00 AM
-
-          // If the day has already passed this month, schedule for next month
-          if (nextDate < new Date()) {
-            nextDate.setMonth(nextDate.getMonth() + 1)
-          }
+          // Next occurrence at 7:00, on the month's last day for days 29-31
+          const nextDate = getNextDueDate(day)
 
           await notificationService.scheduleRecurringTransaction(
             "Recurring Expense Due",

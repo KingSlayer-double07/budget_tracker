@@ -1,25 +1,50 @@
-import React from "react"
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  RefreshControl,
-  TouchableOpacity,
-  ActivityIndicator,
-  Alert,
-} from "react-native"
+import React, { useMemo } from "react"
+import { View, Text, ScrollView, RefreshControl, Pressable } from "react-native"
 import { useRouter } from "expo-router"
+import { Ionicons } from "@expo/vector-icons"
 import { useBudget } from "../context/BudgetContext"
-import { NotificationService } from "../services/NotificationService"
-import { useAuth } from "../context/AuthContext"
+import { UNCATEGORIZED } from "../database"
+import CategoryBreakdown from "../components/CategoryBreakdown"
+import TransactionRow from "../components/TransactionRow"
+import {
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  SectionTitle,
+} from "../components/ui"
+import { formatNaira, makeStyles, useTheme } from "../../theme"
+
+const RECENT_COUNT = 5
+// Bright amber reads on the green hero card in both themes
+const HERO_WARNING = "#F2C14E"
+
+interface RecentEntry {
+  key: string
+  title: string
+  amount: number
+  date: string
+  kind: "income" | "expense"
+  category?: string | null
+}
 
 export default function Index() {
   const router = useRouter()
-  const { totalIncome, totalExpenses, balance, isLoading, error, refreshData } =
-    useBudget()
-  const { handleAuthentication } = useAuth()
-
+  const {
+    balance,
+    incomeList,
+    expenseList,
+    categoryTotals,
+    monthlyIncome,
+    monthlyExpenses,
+    monthlyBudget,
+    isLoading,
+    error,
+    refreshData,
+  } = useBudget()
+  const styles = useStyles()
+  const { colors } = useTheme()
   const [refreshing, setRefreshing] = React.useState(false)
 
   const onRefresh = React.useCallback(async () => {
@@ -28,206 +53,280 @@ export default function Index() {
     setRefreshing(false)
   }, [refreshData])
 
-  const testNotification = async () => {
-    try {
-      const notificationService = NotificationService.getInstance()
-      await notificationService.testNotification()
-      Alert.alert(
-        "Success",
-        "Test notification scheduled! You should receive it now."
+  // Latest income and expenses together, newest first
+  const recent = useMemo<RecentEntry[]>(() => {
+    const entries: (RecentEntry & { id: number })[] = [
+      ...incomeList.map((i: any) => ({
+        key: `income-${i.id}`,
+        id: i.id,
+        title: i.source,
+        amount: i.amount,
+        date: i.date,
+        kind: "income" as const,
+      })),
+      ...expenseList.map((e: any) => ({
+        key: `expense-${e.id}`,
+        id: e.id,
+        title: e.item,
+        amount: e.amount,
+        date: e.date,
+        kind: "expense" as const,
+        category: e.category_name,
+      })),
+    ]
+    return entries
+      .sort((a, b) =>
+        a.date === b.date ? b.id - a.id : b.date.localeCompare(a.date)
       )
-    } catch (error) {
-      Alert.alert(
-        "Error",
-        "Failed to schedule test notification. Please check your notification permissions."
-      )
-    }
-  }
+      .slice(0, RECENT_COUNT)
+  }, [incomeList, expenseList])
 
   if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator
-          size="large"
-          color="#007bff"
-        />
-      </View>
-    )
+    return <LoadingState />
   }
 
   if (error) {
     return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity
-          style={styles.retryButton}
-          onPress={refreshData}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
-      </View>
+      <ErrorState
+        message={error}
+        onRetry={refreshData}
+      />
     )
   }
+
+  const monthLabel = new Date().toLocaleDateString("en-GB", {
+    month: "long",
+    year: "numeric",
+  })
+  const monthBalance = monthlyIncome - monthlyExpenses
+
+  // Budget progress: green, amber from 80%, red once it's exceeded
+  const budgetShare = monthlyBudget ? monthlyExpenses / monthlyBudget : 0
+  const overBudget = monthlyBudget !== null && monthlyExpenses > monthlyBudget
+  const barColor = overBudget
+    ? colors.dangerSolid
+    : budgetShare >= 0.8
+      ? HERO_WARNING
+      : colors.onPrimary
 
   return (
     <ScrollView
       style={styles.container}
+      contentContainerStyle={styles.content}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
+          colors={[colors.primary]}
+          tintColor={colors.primary}
         />
       }>
-      <View style={styles.header}>
-        <Text style={styles.heading}>Your Dashboard</Text>
-        <TouchableOpacity
-          style={styles.settingsButton}
-          onPress={() => router.push("/settingsScreen")}>
-          <Text style={styles.settingsButtonText}>⚙️</Text>
-        </TouchableOpacity>
+      {/* This month's spending against the budget */}
+      <View style={styles.hero}>
+        <Text style={styles.heroLabel}>Spent in {monthLabel}</Text>
+        <Text style={styles.heroValue}>{formatNaira(monthlyExpenses)}</Text>
+        {monthlyBudget !== null ? (
+          <>
+            <View style={styles.heroTrack}>
+              <View
+                style={[
+                  styles.heroBar,
+                  {
+                    width: `${Math.min(budgetShare, 1) * 100}%`,
+                    backgroundColor: barColor,
+                  },
+                ]}
+              />
+            </View>
+            <Text style={styles.heroMeta}>
+              {overBudget
+                ? `${formatNaira(monthlyExpenses - monthlyBudget)} over your ${formatNaira(monthlyBudget)} budget`
+                : `${formatNaira(monthlyBudget - monthlyExpenses)} left of ${formatNaira(monthlyBudget)}`}
+            </Text>
+          </>
+        ) : (
+          <Pressable
+            onPress={() => router.push("/settingsScreen")}
+            hitSlop={8}
+            style={styles.setBudget}>
+            <Text style={styles.heroMeta}>Set a monthly budget</Text>
+            <Ionicons
+              name="chevron-forward"
+              size={16}
+              color={colors.onPrimary}
+            />
+          </Pressable>
+        )}
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.label}>💰 Total Income:</Text>
-        <Text style={styles.value}>NGN{totalIncome.toLocaleString()}</Text>
+      <View style={styles.statsRow}>
+        <Card style={styles.statCard}>
+          <Text style={styles.statLabel}>Income this month</Text>
+          <Text style={[styles.statValue, { color: colors.income }]}>
+            {formatNaira(monthlyIncome)}
+          </Text>
+        </Card>
+        <Card style={styles.statCard}>
+          <Text style={styles.statLabel}>Left this month</Text>
+          <Text
+            style={[
+              styles.statValue,
+              { color: monthBalance >= 0 ? colors.text : colors.danger },
+            ]}>
+            {formatNaira(monthBalance)}
+          </Text>
+        </Card>
       </View>
-
-      <View style={styles.card}>
-        <Text style={styles.label}>🛒 Total Expenses:</Text>
-        <Text style={styles.value}>NGN{totalExpenses.toLocaleString()}</Text>
-      </View>
-
-      <View style={styles.card}>
+      <Text style={styles.allTime}>
+        All-time balance:{" "}
         <Text
           style={[
-            styles.value,
-            balance >= 0 ? styles.positive : styles.negative,
+            styles.allTimeValue,
+            { color: balance >= 0 ? colors.text : colors.danger },
           ]}>
-          📊 Balance: NGN{balance.toLocaleString()}
+          {formatNaira(balance)}
         </Text>
+      </Text>
+
+      <View style={styles.actions}>
+        <Button
+          title="Add Expense"
+          onPress={() => router.push("/addExpenseScreen")}
+          style={styles.action}
+        />
+        <Button
+          title="Add Income"
+          variant="secondary"
+          onPress={() => router.push("/addIncomeScreen")}
+          style={styles.action}
+        />
       </View>
 
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => router.push("/addIncomeScreen")}>
-          <Text style={styles.buttonText}>Manage Income</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => router.push("/addExpenseScreen")}>
-          <Text style={styles.buttonText}>Manage Expense</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => router.push("/addPurchaseScreen")}>
-          <Text style={styles.buttonText}>Manage Purchases</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.button, styles.testButton]}
-          onPress={() => router.push("/statsScreen")}>
-          <Text style={styles.buttonText}>View Stats</Text>
-        </TouchableOpacity>
-      </View>
+      {categoryTotals.length > 0 && (
+        <CategoryBreakdown
+          totals={categoryTotals}
+          limit={3}
+          title="Top categories"
+        />
+      )}
+
+      <SectionTitle title="Recent activity" />
+      {recent.length === 0 ? (
+        <EmptyState message="Nothing recorded yet. Add your first expense or income." />
+      ) : (
+        recent.map((entry) => (
+          <TransactionRow
+            key={entry.key}
+            title={entry.title}
+            amount={entry.amount}
+            kind={entry.kind}
+            date={entry.date}
+            tag={
+              entry.kind === "expense"
+                ? {
+                    label: entry.category ?? UNCATEGORIZED,
+                    muted: !entry.category,
+                  }
+                : undefined
+            }
+            onPress={() =>
+              router.push(
+                entry.kind === "income" ? "/addIncomeScreen" : "/addExpenseScreen"
+              )
+            }
+          />
+        ))
+      )}
     </ScrollView>
   )
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, spacing, radius, font }) => ({
   container: {
     flex: 1,
-    padding: 20,
-    backgroundColor: "#f4f4f4",
+    backgroundColor: colors.background,
   },
-  header: {
+  content: {
+    padding: spacing.lg,
+    paddingBottom: spacing.xl * 2,
+  },
+  hero: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.lg,
+    padding: spacing.xl,
+    marginBottom: spacing.md,
+  },
+  heroLabel: {
+    fontSize: font.label,
+    fontWeight: "500",
+    color: colors.onPrimary,
+    opacity: 0.85,
+  },
+  heroValue: {
+    fontSize: 34,
+    fontWeight: "800",
+    color: colors.onPrimary,
+    marginTop: spacing.xs,
+    marginBottom: spacing.lg,
+    fontVariant: ["tabular-nums"],
+  },
+  heroTrack: {
+    height: 8,
+    borderRadius: radius.pill,
+    // Translucent track works on both the light and dark green
+    backgroundColor: "rgba(127, 127, 127, 0.35)",
+    overflow: "hidden",
+    marginBottom: spacing.sm,
+  },
+  heroBar: {
+    height: 8,
+    borderRadius: radius.pill,
+  },
+  heroMeta: {
+    fontSize: font.label,
+    fontWeight: "500",
+    color: colors.onPrimary,
+  },
+  setBudget: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
+    gap: 2,
+    alignSelf: "flex-start",
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f4f4f4",
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f4f4f4",
-    padding: 20,
-  },
-  errorText: {
-    color: "red",
-    fontSize: 16,
-    textAlign: "center",
-    marginBottom: 20,
-  },
-  retryButton: {
-    backgroundColor: "#007bff",
-    padding: 10,
-    borderRadius: 5,
-  },
-  retryButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  heading: {
-    fontSize: 22,
-    fontWeight: "bold",
-  },
-  settingsButton: {
-    padding: 10,
-  },
-  settingsButtonText: {
-    fontSize: 24,
-  },
-  card: {
-    padding: 20,
-    backgroundColor: "white",
-    borderRadius: 10,
-    marginBottom: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  value: {
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  positive: {
-    color: "green",
-  },
-  negative: {
-    color: "red",
-  },
-  buttonContainer: {
+  statsRow: {
     flexDirection: "row",
-    marginInline: 5,
-    justifyContent: "space-evenly",
-    flexWrap: "wrap",
-    marginTop: 10,
+    gap: spacing.md,
   },
-  button: {
-    flexBasis: "45%",
-    backgroundColor: "#043927",
-    padding: 5,
-    borderRadius: 10,
-    alignItems: "center",
-    marginBottom: 5,
+  statCard: {
+    flex: 1,
+    gap: spacing.xs,
   },
-  buttonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
+  statLabel: {
+    fontSize: font.caption + 1,
+    color: colors.textMuted,
   },
-  testButton: {
-    backgroundColor: "#6c757d",
+  statValue: {
+    fontSize: font.heading + 1,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
   },
-})
+  allTime: {
+    fontSize: font.label,
+    color: colors.textMuted,
+    marginTop: spacing.md,
+    marginLeft: spacing.xs,
+  },
+  allTimeValue: {
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
+  },
+  actions: {
+    flexDirection: "row",
+    gap: spacing.md,
+    marginTop: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+  action: {
+    flex: 1,
+  },
+}))

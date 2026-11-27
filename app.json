@@ -19,7 +19,7 @@
         ],
         "ITSAppUsesNonExemptEncryption": false
       },
-      "bundleIdentifier": "com.kingslayer_double07.budget_tracker"
+      "bundleIdentifier": "com.kingslayer-double07.budget-tracker"
     },
     "android": {
       "adaptiveIcon": {

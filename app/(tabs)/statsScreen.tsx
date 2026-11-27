@@ -1,20 +1,19 @@
 import React, { useContext } from "react"
-import { View, ScrollView, Text } from "react-native"
+import { ScrollView } from "react-native"
 import TrendGraph from "../components/TrendGraph"
 import { Transaction } from "../components/TrendGraph"
 import CategoryBreakdown from "../components/CategoryBreakdown"
+import { EmptyState } from "../components/ui"
 import { TransactionsContext } from "../context/TransactionsContext"
 import { useBudget } from "../context/BudgetContext"
+import { makeStyles } from "../../theme"
 
 export default function StatsScreen() {
-  const context = useContext(TransactionsContext) || { transactions: [] }
-  const { categoryTotals } = useBudget()
-
-  if (!context) {
-    return <Text>Loading...</Text>
+  const { transactions } = useContext(TransactionsContext) || {
+    transactions: [],
   }
-
-  const { transactions } = context
+  const { categoryTotals } = useBudget()
+  const styles = useStyles()
 
   // Ensure transactions is an array and filter out invalid entries
   const validTransactions: Transaction[] = Array.isArray(transactions)
@@ -29,13 +28,11 @@ export default function StatsScreen() {
     : []
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: "#f9f9f9", padding: 16 }}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}>
       {validTransactions.length === 0 ? (
-        <View style={{ alignItems: "center", marginTop: 40 }}>
-          <Text style={{ color: "#888", fontSize: 16 }}>
-            No transactions to display.
-          </Text>
-        </View>
+        <EmptyState message="No expenses to show yet." />
       ) : (
         <>
           <CategoryBreakdown totals={categoryTotals} />
@@ -45,3 +42,14 @@ export default function StatsScreen() {
     </ScrollView>
   )
 }
+
+const useStyles = makeStyles(({ colors, spacing }) => ({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  content: {
+    padding: spacing.lg,
+    paddingBottom: spacing.xl * 2,
+  },
+}))

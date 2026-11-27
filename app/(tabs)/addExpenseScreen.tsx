@@ -1,27 +1,40 @@
 import React, { useState } from "react"
-import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  Switch,
-  FlatList,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-  Pressable,
-} from "react-native"
-import { useRouter } from "expo-router"
+import { View, Text, Switch, FlatList, Alert, Pressable } from "react-native"
 import { useBudget } from "../context/BudgetContext"
-import { stopRecurring, getNextDueDate, UNCATEGORIZED } from "../database"
+import {
+  stopRecurring,
+  getNextDueDate,
+  clearExpensesTable,
+  UNCATEGORIZED,
+} from "../database"
 import { NotificationService } from "../services/NotificationService"
-import { clearExpensesTable } from "../database"
 import ConfirmationModal from "../components/ConfirmationModal"
 import {
   CategoryChips,
   CategoryPickerModal,
 } from "../components/CategoryPicker"
-import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable"
+import TransactionRow from "../components/TransactionRow"
+import {
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+  Field,
+  LoadingState,
+  SectionTitle,
+} from "../components/ui"
+import { formatNaira, makeStyles, useTheme } from "../../theme"
+
+interface ExpenseEntry {
+  id: number
+  item: string
+  amount: number
+  date: string
+  is_recurring: boolean
+  recurring_date: string | null
+  category_id: number | null
+  category_name: string | null
+}
 
 export default function AddExpenseScreen() {
   const [description, setDescription] = useState("")
@@ -30,20 +43,13 @@ export default function AddExpenseScreen() {
   const [recurringDate, setRecurringDate] = useState("")
   const [categoryId, setCategoryId] = useState<number | null>(null)
   // Expense whose category is being changed from the history list
-  const [recategorizing, setRecategorizing] = useState<{
-    id: number
-    item: string
-    category_id: number | null
-  } | null>(null)
+  const [recategorizing, setRecategorizing] = useState<ExpenseEntry | null>(
+    null
+  )
   const [showCancelModal, setShowCancelModal] = useState(false)
-  const [selectedExpense, setSelectedExpense] = useState<{
-    id: number
-    item: string
-    amount: number
-    is_recurring: boolean
-    recurring_date: string | null
-  } | null>(null)
-  const router = useRouter()
+  const [selectedExpense, setSelectedExpense] = useState<ExpenseEntry | null>(
+    null
+  )
   const {
     expenseList,
     isLoading,
@@ -54,6 +60,8 @@ export default function AddExpenseScreen() {
     categories,
     changeExpenseCategory,
   } = useBudget()
+  const styles = useStyles()
+  const { colors } = useTheme()
 
   const handleSaveExpense = async () => {
     if (!description.trim() || !amount.trim()) {
@@ -86,7 +94,7 @@ export default function AddExpenseScreen() {
 
           await notificationService.scheduleRecurringTransaction(
             "Recurring Expense Due",
-            `Your recurring expense of NGN${numAmount.toLocaleString()} for ${description} is due next on ${nextDate.toLocaleDateString()}`,
+            `Your recurring expense of ${formatNaira(numAmount)} for ${description} is due next on ${nextDate.toLocaleDateString()}`,
             nextDate,
             `recurring-expense-${description}-${recurringDate}`,
             description,
@@ -98,9 +106,10 @@ export default function AddExpenseScreen() {
           )
         }
 
-        Alert.alert("Success", "Expense added successfully!")
+        // The new entry appearing at the top of the history is the feedback
         setDescription("")
         setAmount("")
+        setIsRecurring(false)
         setRecurringDate("")
         setCategoryId(null)
       } else {
@@ -111,45 +120,27 @@ export default function AddExpenseScreen() {
     }
   }
 
-  const handleLongPress = (expense: {
-    id: number
-    item: string
-    amount: number
-    is_recurring: boolean
-    recurring_date: string | null
-  }) => {
+  const handleLongPress = (expense: ExpenseEntry) => {
     if (expense.is_recurring) {
       setSelectedExpense(expense)
       setShowCancelModal(true)
     }
   }
 
-  const handleDelete = async (id: number) => {
-    Alert.alert(
-      "Delete Expense",
-      "Are you sure you want to delete this expense?",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
+  const handleDelete = (expense: ExpenseEntry) => {
+    Alert.alert("Delete Expense", `Delete "${expense.item}"?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          const success = await deleteSelectedExpense(expense.id)
+          if (!success) {
+            Alert.alert("Error", "Failed to delete expense. Please try again.")
+          }
         },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            const success = await deleteSelectedExpense(id)
-            if (success) {
-              Alert.alert("Success", "Expense deleted successfully!")
-            } else {
-              Alert.alert(
-                "Error",
-                "Failed to delete expense. Please try again."
-              )
-            }
-          },
-        },
-      ]
-    )
+      },
+    ])
   }
 
   const handleClearAll = () => {
@@ -157,10 +148,7 @@ export default function AddExpenseScreen() {
       "Clear All Expenses",
       "Are you sure you want to delete all expenses? This action is irreversible.",
       [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
+        { text: "Cancel", style: "cancel" },
         {
           text: "Clear All",
           style: "destructive",
@@ -169,21 +157,10 @@ export default function AddExpenseScreen() {
             const success = await clearExpensesTable()
             if (success) {
               await refreshData()
-              Alert.alert("Success", "All expenses have been cleared")
             }
           },
         },
       ]
-    )
-  }
-
-  const renderRightActions = (item: any) => {
-    return (
-      <TouchableOpacity
-        style={styles.leftAction}
-        onPress={() => handleDelete(item.id)}>
-        <Text style={styles.actionText}>Delete</Text>
-      </TouchableOpacity>
     )
   }
 
@@ -201,7 +178,6 @@ export default function AddExpenseScreen() {
         selectedExpense.item,
         `recurring-expense-${selectedExpense.item}-${selectedExpense.recurring_date}`
       )
-      Alert.alert("Success", "Future occurrences cancelled successfully")
       setShowCancelModal(false)
       setSelectedExpense(null)
     } catch (error) {
@@ -220,102 +196,37 @@ export default function AddExpenseScreen() {
     }
   }
 
-  const renderExpenseItem = ({
-    item,
-  }: {
-    item: {
-      id: number
-      item: string
-      amount: number
-      is_recurring: boolean
-      recurring_date: string | null
-      category_id: number | null
-      category_name: string | null
-    }
-  }) => (
-    <Swipeable
-      renderRightActions={() => renderRightActions(item)}
-      rightThreshold={40}
-      overshootRight={true}>
-      <Pressable
-        style={styles.expenseItem}
-        onPress={() => setRecategorizing(item)}
-        onLongPress={() => handleLongPress(item)}
-        delayLongPress={500}>
-        <View style={styles.expenseContent}>
-          <View style={styles.expenseHeader}>
-            <Text style={styles.expenseDescription}>{item.item}</Text>
-            <Text
-              style={[
-                styles.categoryTag,
-                !item.category_name && styles.categoryTagEmpty,
-              ]}>
-              {item.category_name ?? UNCATEGORIZED}
-            </Text>
-          </View>
-          <Text style={styles.expenseAmount}>
-            NGN{item.amount.toLocaleString()}
-          </Text>
-          {item.recurring_date && (
-            <Text style={styles.recurringText}>
-              Recurring on day {item.recurring_date}
-            </Text>
-          )}
-        </View>
-      </Pressable>
-    </Swipeable>
-  )
-
   if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator
-          size="large"
-          color="#ffc107"
-        />
-      </View>
-    )
+    return <LoadingState />
   }
 
   if (error) {
     return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity
-          style={styles.retryButton}
-          onPress={refreshData}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
-      </View>
+      <ErrorState
+        message={error}
+        onRetry={refreshData}
+      />
     )
   }
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Expense Description"
+  // Rendered as the list header so the whole screen scrolls together
+  const form = (
+    <View>
+      <Card style={styles.formCard}>
+        <Field
+          label="What did you spend on?"
+          placeholder="e.g. Groceries"
           value={description}
           onChangeText={setDescription}
         />
-        <TextInput
-          style={styles.input}
-          placeholder="Amount"
+        <Field
+          label="Amount (₦)"
+          placeholder="0"
           value={amount}
           onChangeText={setAmount}
           keyboardType="numeric"
         />
-        <View style={styles.switchContainer}>
-          <Text style={styles.switchLabel}>Recurring Expense</Text>
-          <Switch
-            value={isRecurring}
-            onValueChange={setIsRecurring}
-            trackColor={{ false: "#767577", true: "#81b0ff" }}
-            thumbColor={isRecurring ? "#043927" : "#f4f3f4"}
-          />
-        </View>
-        <Text style={styles.fieldLabel}>Category</Text>
+        <Text style={styles.label}>Category</Text>
         <View style={styles.categoryPicker}>
           <CategoryChips
             categories={categories}
@@ -323,47 +234,84 @@ export default function AddExpenseScreen() {
             onSelect={setCategoryId}
           />
         </View>
+        <View style={styles.switchRow}>
+          <Text style={styles.switchLabel}>Repeats monthly</Text>
+          <Switch
+            value={isRecurring}
+            onValueChange={setIsRecurring}
+            trackColor={{ false: colors.border, true: colors.primarySoft }}
+            thumbColor={isRecurring ? colors.primary : colors.surfaceMuted}
+          />
+        </View>
         {isRecurring && (
-          <TextInput
-            style={styles.input}
-            placeholder="Day of month (1-31)"
+          <Field
+            label="Day of the month"
+            placeholder="1-31"
             value={recurringDate}
             onChangeText={setRecurringDate}
             keyboardType="numeric"
             maxLength={2}
+            hint="Days 29-31 fall on the last day of shorter months"
           />
         )}
-        <TouchableOpacity
-          style={styles.button}
-          onPress={handleSaveExpense}>
-          <Text style={styles.buttonText}>Add Expense</Text>
-        </TouchableOpacity>
-      </View>
+        <Button
+          title="Add Expense"
+          onPress={handleSaveExpense}
+        />
+      </Card>
 
-      <View style={styles.historyContainer}>
-        <View style={styles.historyHeader}>
-          <Text style={styles.historyTitle}>Expense History</Text>
-          <TouchableOpacity
-            style={styles.clearButton}
+      <SectionTitle
+        title="History"
+        action={
+          <Pressable
             onPress={handleClearAll}
-            disabled={expenseList.length === 0}>
+            disabled={expenseList.length === 0}
+            hitSlop={8}>
             <Text
               style={[
-                styles.clearButtonText,
-                expenseList.length === 0 && styles.clearButtonDisabled,
+                styles.clearText,
+                expenseList.length === 0 && styles.clearTextDisabled,
               ]}>
-              Clear All
+              Clear all
             </Text>
-          </TouchableOpacity>
-        </View>
-        <FlatList
-          data={expenseList}
-          renderItem={renderExpenseItem}
-          keyExtractor={(item) => item.id.toString()}
-          style={styles.list}
-          showsVerticalScrollIndicator={false}
-        />
-      </View>
+          </Pressable>
+        }
+      />
+      {expenseList.length > 0 && (
+        <Text style={styles.hint}>
+          Tap to change category · Hold a repeating expense to stop it · Swipe
+          left to delete
+        </Text>
+      )}
+    </View>
+  )
+
+  return (
+    <View style={styles.container}>
+      <FlatList
+        data={expenseList as ExpenseEntry[]}
+        keyExtractor={(item) => item.id.toString()}
+        ListHeaderComponent={form}
+        ListEmptyComponent={<EmptyState message="No expenses yet." />}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        renderItem={({ item }) => (
+          <TransactionRow
+            title={item.item}
+            amount={item.amount}
+            kind="expense"
+            date={item.date}
+            recurringDay={item.is_recurring ? item.recurring_date : null}
+            tag={{
+              label: item.category_name ?? UNCATEGORIZED,
+              muted: !item.category_name,
+            }}
+            onPress={() => setRecategorizing(item)}
+            onLongPress={() => handleLongPress(item)}
+            onDelete={() => handleDelete(item)}
+          />
+        )}
+      />
 
       <CategoryPickerModal
         visible={recategorizing !== null}
@@ -376,8 +324,8 @@ export default function AddExpenseScreen() {
 
       <ConfirmationModal
         visible={showCancelModal}
-        title="Cancel Future Occurrences"
-        message={`Are you sure you want to cancel future occurrences of the recurring expense "${selectedExpense?.item}"?`}
+        title="Stop Repeating"
+        message={`Stop recording "${selectedExpense?.item}" every month? Entries already recorded are kept.`}
         onConfirm={handleCancelFutureOccurrences}
         onCancel={() => {
           setShowCancelModal(false)
@@ -388,178 +336,49 @@ export default function AddExpenseScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, spacing, font }) => ({
   container: {
     flex: 1,
-    padding: 20,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: colors.background,
   },
-  inputContainer: {
-    backgroundColor: "white",
-    padding: 20,
-    borderRadius: 10,
-    marginBottom: 20,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+  content: {
+    padding: spacing.lg,
+    paddingBottom: spacing.xl * 2,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    padding: 10,
-    borderRadius: 5,
-    marginBottom: 10,
-    fontSize: 16,
+  formCard: {
+    marginBottom: spacing.xl,
   },
-  switchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 10,
-  },
-  switchLabel: {
-    fontSize: 16,
-    color: "#333",
-  },
-  button: {
-    backgroundColor: "#043927",
-    padding: 15,
-    borderRadius: 5,
-    alignItems: "center",
-  },
-  buttonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  historyContainer: {
-    flex: 1,
-    backgroundColor: "white",
-    borderRadius: 10,
-    padding: 20,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  historyHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 15,
-  },
-  historyTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#043927",
-  },
-  clearButton: {
-    padding: 8,
-  },
-  clearButtonText: {
-    color: "#ff4444",
-    fontSize: 16,
-  },
-  clearButtonDisabled: {
-    color: "#ccc",
-  },
-  list: {
-    flex: 1,
-  },
-  expenseItem: {
-    backgroundColor: "#f8f9fa",
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: "#e9ecef",
-  },
-  expenseContent: {
-    flexDirection: "column",
-  },
-  expenseHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 8,
-  },
-  expenseDescription: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#043927",
-    marginBottom: 5,
-  },
-  categoryTag: {
-    fontSize: 12,
-    color: "#043927",
-    backgroundColor: "#e3efe9",
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 10,
-    overflow: "hidden",
-  },
-  categoryTagEmpty: {
-    color: "#6c757d",
-    backgroundColor: "#eceff1",
-  },
-  fieldLabel: {
-    fontSize: 14,
-    color: "#555",
+  label: {
+    fontSize: font.label,
+    fontWeight: "500",
+    color: colors.textMuted,
     marginBottom: 6,
   },
   categoryPicker: {
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
-  expenseAmount: {
-    fontSize: 16,
-    color: "#dc3545",
-    marginBottom: 5,
-  },
-  recurringText: {
-    fontSize: 14,
-    color: "#6c757d",
-    fontStyle: "italic",
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
+  switchRow: {
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: spacing.md,
   },
-  errorContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+  switchLabel: {
+    fontSize: font.body,
+    color: colors.text,
   },
-  errorText: {
-    color: "#dc3545",
-    fontSize: 16,
-    marginBottom: 20,
+  clearText: {
+    fontSize: font.label,
+    fontWeight: "600",
+    color: colors.danger,
   },
-  retryButton: {
-    backgroundColor: "#043927",
-    padding: 10,
-    borderRadius: 5,
+  clearTextDisabled: {
+    color: colors.textSubtle,
   },
-  retryButtonText: {
-    color: "white",
-    fontSize: 16,
+  hint: {
+    fontSize: font.caption,
+    color: colors.textSubtle,
+    marginTop: -spacing.sm,
+    marginBottom: spacing.md,
   },
-  leftAction: {
-    backgroundColor: "#dc3545",
-    justifyContent: "center",
-    alignItems: "center",
-    width: 100,
-    height: "100%",
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-  actionText: {
-    color: "white",
-    fontSize: 14,
-    fontWeight: "bold",
-  },
-})
+}))

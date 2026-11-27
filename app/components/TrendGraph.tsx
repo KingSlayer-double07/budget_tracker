@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from "react"
-import { View, Text, TouchableOpacity } from "react-native"
-import { Polyline, Line, Circle, Svg, Text as SVGText } from "react-native-svg"
+import React, { useMemo, useState } from "react"
+import { LayoutChangeEvent, Pressable, Text, View } from "react-native"
+import { Circle, Line, Polyline, Svg, Text as SVGText } from "react-native-svg"
+import { Card } from "./ui"
+import { formatCompactNaira, makeStyles, useTheme } from "../../theme"
 
 export interface Transaction {
   amount: number
@@ -50,230 +52,218 @@ export const groupDataByTimeframe = (
     .map((key) => dataMap[key])
 }
 
-const TrendGraph: React.FC<SpendingTrendsChartProps> = ({ transactions }) => {
-  const [timeframe, setTimeframe] = useState("weekly")
-  const [chartData, setChartData] = useState<GroupedData[]>([])
+const TIMEFRAMES = [
+  { key: "weekly", label: "Weekly", unit: "weeks" },
+  { key: "monthly", label: "Monthly", unit: "months" },
+  { key: "all-time", label: "Yearly", unit: "years" },
+]
 
-  useEffect(() => {
-    const groupedData = groupDataByTimeframe(transactions, timeframe)
-    setChartData(transactions.length ? groupedData : [])
-  }, [transactions, timeframe])
+// Most recent periods shown, so points and labels stay readable
+const MAX_POINTS = 12
+const CHART_HEIGHT = 220
+const PAD = { top: 12, right: 12, bottom: 28, left: 52 }
+const Y_TICKS = 4
 
-  const LineGraph: React.FC<{ chartData: GroupedData[] }> = ({ chartData }) => {
-    // Add margins for labels
-    const marginLeft = 16 // space for Y-axis labels
-    const marginBottom = 12 // space for X-axis labels
-    const graphWidth = 100
-    const graphHeight = 100
-    const svgWidth = graphWidth + marginLeft
-    const svgHeight = graphHeight + marginBottom
-    const yTicks = 5
+function LineChart({ data, width }: { data: GroupedData[]; width: number }) {
+  const { colors } = useTheme()
+  const plotWidth = width - PAD.left - PAD.right
+  const plotHeight = CHART_HEIGHT - PAD.top - PAD.bottom
 
-    if (chartData.length === 0) {
-      return (
-        <View
-          style={{
-            flex: 1,
-            justifyContent: "center",
-            alignItems: "center",
-            height: 300,
-          }}>
-          <Text style={{ color: "#888" }}>No data to display.</Text>
-        </View>
-      )
-    }
+  // Scale from zero so differences between periods aren't exaggerated
+  const maxTotal = Math.max(...data.map((d) => d.total), 1)
+  const xFor = (index: number) =>
+    PAD.left +
+    (data.length === 1 ? plotWidth / 2 : (index / (data.length - 1)) * plotWidth)
+  const yFor = (value: number) =>
+    PAD.top + plotHeight - (value / maxTotal) * plotHeight
 
-    if (chartData.length === 1) {
-      return (
-        <View
-          style={{
-            alignItems: "center",
-            height: 300,
-            justifyContent: "center",
-          }}>
-          <Svg
-            width={svgWidth}
-            height={svgHeight}
-            viewBox={`0 0 ${svgWidth} ${svgHeight}`}>
-            {/* Y-axis label */}
-            <SVGText
-              x={marginLeft - 2}
-              y={graphHeight / 2 + 3}
-              fontSize="4"
-              fill="#888"
-              textAnchor="end">
-              {chartData[0].total}
-            </SVGText>
-            <Circle
-              cx={marginLeft + graphWidth / 2}
-              cy={graphHeight / 2}
-              r={4}
-              fill="#4f46e5"
-            />
-          </Svg>
-          <Text style={{ textAlign: "center", marginTop: 8 }}>
-            {chartData[0].name}
-          </Text>
-        </View>
-      )
-    }
+  const ticks = Array.from({ length: Y_TICKS + 1 }, (_, i) => {
+    const value = (maxTotal / Y_TICKS) * i
+    return { value, y: yFor(value) }
+  })
 
-    const maxTotal = Math.max(...chartData.map((d) => d.total)) || 1
-    const minTotal = Math.min(...chartData.map((d) => d.total)) || 0
-    // When calculating x and y, offset by marginLeft and marginBottom
-    const points = chartData
-      .map((data, index) => {
-        const x = marginLeft + (index / (chartData.length - 1)) * graphWidth
-        const y = (data.total - minTotal) / (maxTotal - minTotal || 1)
-        const yPos = graphHeight - y * graphHeight
-        return `${x},${yPos}`
-      })
-      .join(" ")
-
-    const yAxisTicks = Array.from({ length: yTicks + 1 }, (_, i) => {
-      const value = maxTotal - ((maxTotal - minTotal) / yTicks) * i
-      const y = (graphHeight / yTicks) * i
-      return { value: Math.round(value), y }
-    })
-
-    return (
-      <View style={{ width: "100%", height: 300 }}>
-        <Svg
-          width="100%"
-          height="100%"
-          viewBox={`0 0 ${svgWidth} ${svgHeight}`}>
-          {/* Y-axis lines and labels */}
-          {yAxisTicks.map((tick, i) => (
-            <React.Fragment key={i}>
-              <Line
-                x1={marginLeft}
-                y1={tick.y}
-                x2={svgWidth}
-                y2={tick.y}
-                stroke="#eee"
-                strokeWidth="0.5"
-              />
-              <SVGText
-                x={marginLeft - 2}
-                y={tick.y + 3}
-                fontSize="4"
-                fill="#888"
-                textAnchor="end">
-                {tick.value}
-              </SVGText>
-            </React.Fragment>
-          ))}
-          {/* X-axis line */}
-          <Line
-            x1={marginLeft}
-            y1={graphHeight}
-            x2={svgWidth}
-            y2={graphHeight}
-            stroke="#aaa"
-            strokeWidth="0.5"
-          />
-          {/* Polyline and points */}
-          <Polyline
-            points={points}
-            fill="none"
-            stroke="#4f46e5"
-            strokeWidth="2"
-          />
-          {chartData.map((data: GroupedData, index: number) => {
-            const x = marginLeft + (index / (chartData.length - 1)) * graphWidth
-            const y = (data.total - minTotal) / (maxTotal - minTotal || 1)
-            const yPos = graphHeight - y * graphHeight
-            return (
-              <Circle
-                key={index}
-                cx={x}
-                cy={yPos}
-                r={3}
-                fill="#4f46e5"
-              />
-            )
-          })}
-        </Svg>
-        {/* X-axis labels */}
-        <View
-          style={{
-            flexDirection: "row",
-            position: "absolute",
-            bottom: 0,
-            left: marginLeft,
-            width: "100%",
-          }}>
-          {chartData.map((data, index) => (
-            <View
-              key={index}
-              style={{
-                position: "absolute",
-                left: `${(index / (chartData.length - 1)) * 100}%`,
-                width: 40,
-                marginLeft: -20,
-                alignItems: "center",
-              }}>
-              <Text
-                style={{ fontSize: 10, color: "#555" }}
-                numberOfLines={1}
-                ellipsizeMode="tail">
-                {data.name}
-              </Text>
-            </View>
-          ))}
-        </View>
-      </View>
-    )
-  }
+  // Label every n-th period when they would otherwise overlap
+  const labelEvery = Math.ceil(data.length / Math.max(1, Math.floor(plotWidth / 56)))
+  const points = data.map((d, i) => `${xFor(i)},${yFor(d.total)}`).join(" ")
 
   return (
-    <View
-      style={{
-        padding: 16,
-        borderRadius: 16,
-        backgroundColor: "#ffffff",
-        marginBottom: 24,
-        shadowColor: "#000",
-        shadowOpacity: 0.1,
-        shadowRadius: 10,
-        elevation: 5,
-      }}>
-      <Text
-        style={{
-          fontSize: 24,
-          fontWeight: "bold",
-          marginBottom: 16,
-          color: "#333",
-        }}>
-        Spending Trends
-      </Text>
-      <View style={{ flexDirection: "row", marginBottom: 16 }}>
-        {["weekly", "monthly", "all-time"].map((option) => (
-          <TouchableOpacity
-            key={option}
-            onPress={() => setTimeframe(option)}
-            style={{
-              paddingVertical: 8,
-              paddingHorizontal: 16,
-              marginRight: 8,
-              borderRadius: 8,
-              backgroundColor: timeframe === option ? "#4f46e5" : "#f0f0f0",
-            }}>
-            <Text
-              style={{
-                color: timeframe === option ? "#ffffff" : "#555",
-                fontWeight: "600",
-              }}>
-              {option.charAt(0).toUpperCase() + option.slice(1)}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-      <View style={{ width: "100%", height: 300 }}>
-        <LineGraph chartData={chartData} />
-      </View>
-    </View>
+    <Svg
+      width={width}
+      height={CHART_HEIGHT}>
+      {ticks.map((tick, i) => (
+        <React.Fragment key={i}>
+          <Line
+            x1={PAD.left}
+            x2={width - PAD.right}
+            y1={tick.y}
+            y2={tick.y}
+            stroke={colors.chartGrid}
+            strokeWidth={1}
+          />
+          <SVGText
+            x={PAD.left - 8}
+            y={tick.y + 4}
+            fontSize={11}
+            fill={colors.textSubtle}
+            textAnchor="end">
+            {formatCompactNaira(tick.value)}
+          </SVGText>
+        </React.Fragment>
+      ))}
+
+      {data.length > 1 && (
+        <Polyline
+          points={points}
+          fill="none"
+          stroke={colors.chart}
+          strokeWidth={2.5}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+      )}
+
+      {data.map((d, i) => (
+        <Circle
+          key={`point-${i}`}
+          cx={xFor(i)}
+          cy={yFor(d.total)}
+          r={i === data.length - 1 ? 5 : 3.5}
+          fill={i === data.length - 1 ? colors.chart : colors.surface}
+          stroke={colors.chart}
+          strokeWidth={2}
+        />
+      ))}
+
+      {data.map((d, i) =>
+        // Always label the latest period
+        (data.length - 1 - i) % labelEvery === 0 ? (
+          <SVGText
+            key={`label-${i}`}
+            x={xFor(i)}
+            y={CHART_HEIGHT - 8}
+            fontSize={11}
+            fill={colors.textMuted}
+            textAnchor="middle">
+            {d.name}
+          </SVGText>
+        ) : null
+      )}
+    </Svg>
   )
 }
+
+const TrendGraph: React.FC<SpendingTrendsChartProps> = ({ transactions }) => {
+  const [timeframe, setTimeframe] = useState("monthly")
+  const [width, setWidth] = useState(0)
+  const styles = useStyles()
+
+  const allData = useMemo(
+    () => groupDataByTimeframe(transactions, timeframe),
+    [transactions, timeframe]
+  )
+  const data = allData.slice(-MAX_POINTS)
+  const unit = TIMEFRAMES.find((t) => t.key === timeframe)?.unit ?? ""
+
+  return (
+    <Card style={styles.card}>
+      <Text style={styles.title}>Spending trend</Text>
+      <Text style={styles.subtitle}>
+        {allData.length > MAX_POINTS
+          ? `Last ${MAX_POINTS} ${unit}`
+          : `All recorded ${unit}`}
+      </Text>
+
+      <View style={styles.segmented}>
+        {TIMEFRAMES.map((option) => {
+          const selected = timeframe === option.key
+          return (
+            <Pressable
+              key={option.key}
+              onPress={() => setTimeframe(option.key)}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              style={[styles.segment, selected && styles.segmentSelected]}>
+              <Text
+                style={[
+                  styles.segmentText,
+                  selected && styles.segmentTextSelected,
+                ]}>
+                {option.label}
+              </Text>
+            </Pressable>
+          )
+        })}
+      </View>
+
+      <View
+        style={styles.chart}
+        onLayout={(e: LayoutChangeEvent) =>
+          setWidth(Math.floor(e.nativeEvent.layout.width))
+        }>
+        {data.length === 0 ? (
+          <Text style={styles.empty}>No data to display.</Text>
+        ) : (
+          width > 0 && (
+            <LineChart
+              data={data}
+              width={width}
+            />
+          )
+        )}
+      </View>
+    </Card>
+  )
+}
+
+const useStyles = makeStyles(({ colors, spacing, radius, font }) => ({
+  card: {
+    marginBottom: spacing.xl,
+  },
+  title: {
+    fontSize: font.heading,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  subtitle: {
+    fontSize: font.label,
+    color: colors.textMuted,
+    marginTop: 2,
+    marginBottom: spacing.lg,
+  },
+  segmented: {
+    flexDirection: "row",
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.md,
+    padding: 3,
+    marginBottom: spacing.lg,
+  },
+  segment: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: spacing.sm,
+    borderRadius: radius.sm,
+  },
+  segmentSelected: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  segmentText: {
+    fontSize: font.label,
+    fontWeight: "600",
+    color: colors.textMuted,
+  },
+  segmentTextSelected: {
+    color: colors.text,
+  },
+  chart: {
+    height: CHART_HEIGHT,
+    justifyContent: "center",
+  },
+  empty: {
+    textAlign: "center",
+    color: colors.textSubtle,
+  },
+}))
 
 export default TrendGraph

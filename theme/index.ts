@@ -147,4 +147,4 @@ export const makeStyles =
     )
   }
 
-export { formatNaira } from "./format"
+export { formatNaira, formatDate, formatCompactNaira } from "./format"

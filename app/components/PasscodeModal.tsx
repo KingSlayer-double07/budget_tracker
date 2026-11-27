@@ -1,12 +1,8 @@
 import React, { useState } from "react"
-import {
-  Modal,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-} from "react-native"
+import { Modal, View, Text, TextInput } from "react-native"
+import { Button } from "./ui"
+import { useModalStyles } from "./ConfirmationModal"
+import { makeStyles, useTheme } from "../../theme"
 
 interface PasscodeModalProps {
   visible: boolean
@@ -26,6 +22,9 @@ export const PasscodeModal: React.FC<PasscodeModalProps> = ({
   onInputChange,
 }) => {
   const [passcode, setPasscode] = useState("")
+  const modalStyles = useModalStyles()
+  const styles = useStyles()
+  const { colors } = useTheme()
 
   const handleSubmit = async (submittedPasscode?: string) => {
     const passcodeToSubmit = submittedPasscode ?? passcode
@@ -46,23 +45,27 @@ export const PasscodeModal: React.FC<PasscodeModalProps> = ({
     <Modal
       visible={visible}
       transparent={true}
-      animationType="fade">
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <Text style={styles.title}>
-            {isNewPasscode ? "Set Passcode" : "Enter Passcode"}
+      animationType="fade"
+      onRequestClose={onCancel}>
+      <View style={modalStyles.overlay}>
+        <View style={modalStyles.content}>
+          <Text style={[modalStyles.title, styles.centered]}>
+            {isNewPasscode ? "Set a Passcode" : "Enter Passcode"}
           </Text>
-          {isWrongPasscode && (
-            <Text style={styles.wrong}>
-              You entered a wrong passcode. Give it another try
-            </Text>
-          )}
+          <Text style={[styles.subtitle, isWrongPasscode && styles.wrong]}>
+            {isWrongPasscode
+              ? "That passcode didn't match. Try again."
+              : isNewPasscode
+                ? "Choose 4 digits to unlock the app"
+                : "Enter your 4-digit passcode"}
+          </Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, isWrongPasscode && styles.inputWrong]}
             secureTextEntry
             keyboardType="numeric"
             maxLength={4}
             value={passcode}
+            autoFocus
             onChangeText={(text) => {
               if (onInputChange) onInputChange()
               setPasscode(text)
@@ -70,64 +73,45 @@ export const PasscodeModal: React.FC<PasscodeModalProps> = ({
                 handleSubmit(text)
               }
             }}
-            placeholder="Enter 4-digit passcode"
+            placeholder="••••"
+            placeholderTextColor={colors.textSubtle}
           />
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={styles.button}
-              onPress={() => handleSubmit()}>
-              <Text style={styles.buttonText}>OK</Text>
-            </TouchableOpacity>
-          </View>
+          <Button
+            title="OK"
+            onPress={() => handleSubmit()}
+          />
         </View>
       </View>
     </Modal>
   )
 }
 
-const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  modalContent: {
-    backgroundColor: "white",
-    padding: 20,
-    borderRadius: 10,
-    width: "80%",
-  },
-  title: {
-    fontSize: 18,
-    marginBottom: 15,
+const useStyles = makeStyles(({ colors, spacing, radius, font }) => ({
+  centered: {
     textAlign: "center",
   },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    padding: 10,
-    borderRadius: 5,
-    marginBottom: 15,
+  subtitle: {
+    fontSize: font.label,
+    color: colors.textMuted,
     textAlign: "center",
-    fontSize: 20,
-  },
-  buttonContainer: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-  },
-  button: {
-    padding: 10,
-    marginLeft: 10,
-  },
-  buttonText: {
-    color: "#007AFF",
-    fontSize: 16,
+    marginBottom: spacing.lg,
   },
   wrong: {
-    color: "#dc3545",
-    fontSize: 12,
-    textAlign: "center",
-    marginBottom: 5,
+    color: colors.danger,
   },
-})
+  input: {
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.lg,
+    textAlign: "center",
+    fontSize: 28,
+    letterSpacing: 12,
+    color: colors.text,
+  },
+  inputWrong: {
+    borderColor: colors.danger,
+  },
+}))

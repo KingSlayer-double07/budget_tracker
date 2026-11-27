@@ -1,13 +1,9 @@
 import React from "react"
-import {
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native"
+import { Modal, Pressable, ScrollView, Text, View } from "react-native"
 import { Category, UNCATEGORIZED } from "../database"
+import { Button } from "./ui"
+import { useModalStyles } from "./ConfirmationModal"
+import { makeStyles } from "../../theme"
 
 interface CategoryChipsProps {
   categories: Category[]
@@ -24,6 +20,7 @@ export function CategoryChips({
   onSelect,
   layout = "row",
 }: CategoryChipsProps) {
+  const styles = useStyles()
   const options: { id: number | null; name: string }[] = [
     ...categories,
     { id: null, name: UNCATEGORIZED },
@@ -32,16 +29,20 @@ export function CategoryChips({
   const chips = options.map((option) => {
     const selected = option.id === selectedId
     return (
-      <TouchableOpacity
+      <Pressable
         key={option.id ?? "none"}
-        style={[styles.chip, selected && styles.chipSelected]}
+        style={({ pressed }) => [
+          styles.chip,
+          selected && styles.chipSelected,
+          pressed && styles.chipPressed,
+        ]}
         onPress={() => onSelect(option.id)}
         accessibilityRole="button"
         accessibilityState={{ selected }}>
         <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
           {option.name}
         </Text>
-      </TouchableOpacity>
+      </Pressable>
     )
   })
 
@@ -77,15 +78,17 @@ export function CategoryPickerModal({
   onSelect,
   onCancel,
 }: CategoryPickerModalProps) {
+  const modalStyles = useModalStyles()
+  const styles = useStyles()
   return (
     <Modal
       visible={visible}
       transparent
       animationType="fade"
       onRequestClose={onCancel}>
-      <View style={styles.overlay}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>{title}</Text>
+      <View style={modalStyles.overlay}>
+        <View style={[modalStyles.content, styles.modalContent]}>
+          <Text style={modalStyles.title}>{title}</Text>
           <ScrollView style={styles.modalScroll}>
             <CategoryChips
               categories={categories}
@@ -94,81 +97,59 @@ export function CategoryPickerModal({
               layout="wrap"
             />
           </ScrollView>
-          <TouchableOpacity
-            style={styles.cancelButton}
-            onPress={onCancel}>
-            <Text style={styles.cancelText}>Cancel</Text>
-          </TouchableOpacity>
+          <View style={[modalStyles.buttons, styles.modalButtons]}>
+            <Button
+              title="Cancel"
+              variant="ghost"
+              onPress={onCancel}
+            />
+          </View>
         </View>
       </View>
     </Modal>
   )
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, spacing, radius, font }) => ({
   row: {
-    gap: 8,
+    gap: spacing.sm,
     paddingVertical: 2,
   },
   wrap: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: spacing.sm,
   },
   chip: {
-    paddingVertical: 8,
+    paddingVertical: spacing.sm,
     paddingHorizontal: 14,
-    borderRadius: 16,
+    borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: "#ddd",
-    backgroundColor: "#f8f9fa",
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceMuted,
   },
   chipSelected: {
-    backgroundColor: "#043927",
-    borderColor: "#043927",
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  chipPressed: {
+    opacity: 0.8,
   },
   chipText: {
-    fontSize: 14,
-    color: "#333",
+    fontSize: font.label,
+    color: colors.text,
   },
   chipTextSelected: {
-    color: "white",
+    color: colors.onPrimary,
     fontWeight: "600",
   },
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
   modalContent: {
-    backgroundColor: "white",
-    borderRadius: 10,
-    padding: 20,
-    width: "85%",
-    maxWidth: 420,
     maxHeight: "75%",
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 15,
-    color: "#043927",
   },
   modalScroll: {
     flexGrow: 0,
   },
-  cancelButton: {
-    marginTop: 20,
-    alignSelf: "flex-end",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 5,
-    backgroundColor: "#ccc",
+  modalButtons: {
+    marginTop: spacing.lg,
   },
-  cancelText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "500",
-  },
-})
+}))

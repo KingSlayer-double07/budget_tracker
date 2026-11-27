@@ -1,14 +1,5 @@
 import React, { useEffect, useState } from "react"
-import {
-  ScrollView,
-  View,
-  Text,
-  StyleSheet,
-  Switch,
-  TextInput,
-  TouchableOpacity,
-  Alert,
-} from "react-native"
+import { ScrollView, View, Text, Switch, Alert, Pressable } from "react-native"
 import { AuthenticationService } from "./services/AuthenticationService"
 import { SecureStorageService } from "./services/SecureStorageService"
 import { useBudget } from "./context/BudgetContext"
@@ -19,6 +10,8 @@ import {
 } from "./database"
 import { useAuth } from "./context/AuthContext"
 import CategoryManager from "./components/CategoryManager"
+import { Button, Card, Field } from "./components/ui"
+import { makeStyles, useTheme } from "../theme"
 
 export default function SettingsScreen() {
   const [biometricEnabled, setBiometricEnabled] = useState(false)
@@ -30,6 +23,8 @@ export default function SettingsScreen() {
   const authService = AuthenticationService.getInstance()
   // The passcode prompt is rendered once by the root layout
   const { isAuthenticated, handleAuthentication, authError } = useAuth()
+  const styles = useStyles()
+  const { colors } = useTheme()
 
   useEffect(() => {
     initializeScreen()
@@ -124,6 +119,8 @@ export default function SettingsScreen() {
       // Allow the alert to fire again this month against the new threshold
       await secureStorage.deleteSecureItem(BUDGET_ALERT_MONTH_KEY)
       await checkBudgetThreshold()
+      // The dashboard shows spending against the budget
+      await refreshData()
 
       Alert.alert("Success", "Budget threshold updated successfully")
     } catch (error) {
@@ -198,194 +195,187 @@ export default function SettingsScreen() {
     )
   }
 
-  return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.heading}>Settings</Text>
+  const switchColors = {
+    trackColor: { false: colors.border, true: colors.primarySoft },
+  }
 
+  return (
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled">
       {!isAuthenticated ? (
         <View style={styles.authContainer}>
-          <Text style={styles.authTitle}>Budget Tracker</Text>
+          <Text style={styles.authTitle}>Settings are locked</Text>
           <Text style={styles.authMessage}>
             {authError || "Please authenticate to access your budget data"}
           </Text>
-          <TouchableOpacity
-            style={styles.authButton}
-            onPress={handleAuthentication}>
-            <Text style={styles.authButtonText}>Authenticate</Text>
-          </TouchableOpacity>
+          <Button
+            title="Authenticate"
+            onPress={handleAuthentication}
+          />
         </View>
       ) : (
         <View>
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Security</Text>
-            <View style={styles.setting}>
-              <Text style={styles.settingLabel}>Budget Security</Text>
+          <Text style={styles.groupLabel}>Budget</Text>
+          <Card style={styles.card}>
+            <Field
+              label="Monthly budget (₦)"
+              value={budgetThreshold}
+              onChangeText={setBudgetThreshold}
+              keyboardType="numeric"
+              placeholder="e.g. 250000"
+              hint="You'll be alerted once when this month's spending reaches it"
+            />
+            <Button
+              title="Save Budget"
+              onPress={updateBudgetThreshold}
+            />
+          </Card>
+
+          <Text style={styles.groupLabel}>Categories</Text>
+          <CategoryManager />
+
+          <Text style={styles.groupLabel}>Security</Text>
+          <Card style={styles.card}>
+            <View style={styles.settingRow}>
+              <View style={styles.settingText}>
+                <Text style={styles.settingLabel}>Lock the app</Text>
+                <Text style={styles.settingHint}>
+                  {biometricEnabled
+                    ? biometricAvailable
+                      ? "Unlock with fingerprint or face, or your passcode"
+                      : "Unlock with your passcode"
+                    : "Anyone with your phone can open the app"}
+                </Text>
+              </View>
               <Switch
                 value={biometricEnabled}
                 onValueChange={toggleBiometric}
-              //disabled={!biometricAvailable}
+                {...switchColors}
+                thumbColor={
+                  biometricEnabled ? colors.primary : colors.surfaceMuted
+                }
               />
             </View>
-            {!biometricEnabled && (
-              <Text style={styles.warning}>Authentication is not enabled.</Text>
-            )}
-          </View>
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Budget Alerts</Text>
-            <View style={styles.setting}>
-              <Text style={styles.settingLabel}>Monthly Budget (NGN)</Text>
-              <TextInput
-                style={styles.input}
-                value={budgetThreshold}
-                onChangeText={setBudgetThreshold}
-                keyboardType="numeric"
-                placeholder="Enter threshold amount"
-              />
-            </View>
-            <TouchableOpacity
-              style={styles.button}
-              onPress={updateBudgetThreshold}>
-              <Text style={styles.buttonText}>Update Threshold</Text>
-            </TouchableOpacity>
-          </View>
-
-          <CategoryManager />
-
-          {hasPasscode && biometricEnabled && (
-            <View style={styles.section}>
-              <TouchableOpacity onPress={handleDelete}>
-                <Text style={styles.sectionTitle}>Reset Passcode</Text>
-              </TouchableOpacity>
-              <View style={styles.setting}>
-                <Text style={styles.settingLabel}>Input new passcode</Text>
-                <TextInput
-                  style={styles.input}
+            {hasPasscode && biometricEnabled && (
+              <View style={styles.passcode}>
+                <Field
+                  label="Passcode"
                   value={newPasscode}
                   secureTextEntry
                   maxLength={4}
                   onChangeText={setNewPasscode}
                   keyboardType="numeric"
-                  placeholder={"****"}
+                  placeholder="••••"
                 />
+                <Button
+                  title="Change Passcode"
+                  variant="secondary"
+                  onPress={changePasscode}
+                />
+                <Pressable
+                  onPress={handleDelete}
+                  hitSlop={8}
+                  style={styles.linkButton}>
+                  <Text style={styles.dangerLink}>Remove passcode</Text>
+                </Pressable>
               </View>
-              <TouchableOpacity
-                style={styles.button}
-                onPress={changePasscode}>
-                <Text style={styles.buttonText}>Change Passcode</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+            )}
+          </Card>
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Database Management</Text>
-            <TouchableOpacity
-              style={[styles.button, styles.dangerButton]}
-              onPress={handleClearDatabase}>
-              <Text style={styles.buttonText}>Clear All Data</Text>
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.groupLabel}>Data</Text>
+          <Card style={styles.card}>
+            <Text style={styles.settingHint}>
+              Deletes all income, expenses and planned purchases on this phone.
+              This can't be undone.
+            </Text>
+            <Button
+              title="Clear All Data"
+              variant="danger"
+              onPress={handleClearDatabase}
+              style={styles.dangerButton}
+            />
+          </Card>
         </View>
       )}
     </ScrollView>
   )
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, spacing, font }) => ({
   container: {
     flex: 1,
-    padding: 20,
-    backgroundColor: "#f4f4f4",
+    backgroundColor: colors.background,
   },
-  heading: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 20,
-    color: "#043927",
+  content: {
+    padding: spacing.lg,
+    paddingBottom: spacing.xl * 2,
   },
-  authContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f4f4f4",
-    padding: 20,
+  groupLabel: {
+    fontSize: font.caption,
+    fontWeight: "700",
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+    color: colors.textMuted,
+    marginBottom: spacing.sm,
+    marginLeft: spacing.xs,
   },
-  authTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#043927",
-    marginBottom: 20,
+  card: {
+    marginBottom: spacing.xl,
   },
-  authMessage: {
-    fontSize: 16,
-    color: "#666",
-    textAlign: "center",
-    marginBottom: 30,
-  },
-  authButton: {
-    backgroundColor: "#043927",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  authButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  section: {
-    backgroundColor: "white",
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 15,
-    color: "#333",
-  },
-  setting: {
+  settingRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 10,
+    gap: spacing.md,
+  },
+  settingText: {
+    flex: 1,
+    gap: 2,
   },
   settingLabel: {
-    fontSize: 16,
-    color: "#333",
+    fontSize: font.body,
+    fontWeight: "600",
+    color: colors.text,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 5,
-    padding: 8,
-    width: 150,
-    textAlign: "right",
+  settingHint: {
+    fontSize: font.label,
+    color: colors.textMuted,
+    lineHeight: 20,
   },
-  button: {
-    backgroundColor: "#007bff",
-    padding: 10,
-    borderRadius: 5,
-    alignItems: "center",
-    marginTop: 10,
+  passcode: {
+    marginTop: spacing.lg,
+    paddingTop: spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
-  buttonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
+  linkButton: {
+    alignSelf: "center",
+    marginTop: spacing.md,
   },
-  warning: {
-    color: "#dc3545",
-    fontSize: 14,
-    marginTop: 5,
+  dangerLink: {
+    fontSize: font.label,
+    fontWeight: "600",
+    color: colors.danger,
   },
   dangerButton: {
-    backgroundColor: "#dc3545",
+    marginTop: spacing.md,
   },
-})
+  authContainer: {
+    alignItems: "center",
+    paddingVertical: spacing.xl * 2,
+    gap: spacing.md,
+  },
+  authTitle: {
+    fontSize: font.title,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  authMessage: {
+    fontSize: font.body,
+    color: colors.textMuted,
+    textAlign: "center",
+    marginBottom: spacing.md,
+  },
+}))

@@ -106,7 +106,8 @@ export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const fetchData = useCallback(async () => {
     try {
-      setIsLoading(true)
+      // isLoading starts true and only covers the first load; later refreshes
+      // keep the current screen visible instead of replacing it with a spinner
       setError(null)
 
       // Fetch all data in parallel

@@ -727,6 +727,56 @@ export const deleteExpense = async (key: number): Promise<boolean> => {
   )
 }
 
+// Validate an edited name and amount, alerting on the first problem
+const validateEdit = (name: string, nameLabel: string, amount: number) => {
+  for (const result of [validateString(name, nameLabel), validateAmount(amount)]) {
+    if (!result.isValid) {
+      Alert.alert("Validation Error", result.error)
+      return false
+    }
+  }
+  return true
+}
+
+// Change an income entry's source and amount. For a repeating entry, later
+// occurrences use the new values; ones already recorded keep theirs.
+export const updateIncome = async (
+  id: number,
+  source: string,
+  amount: number
+): Promise<boolean> => {
+  if (!validateEdit(source, "Source", amount)) return false
+  return (
+    (await safeDatabaseOperation(async (db) => {
+      await db.runAsync(
+        `UPDATE income SET source = ?, amount = ? WHERE id = ?;`,
+        [source.trim(), amount, id]
+      )
+      return true
+    })) || false
+  )
+}
+
+// Change an expense's name, amount and category. For a repeating expense,
+// later occurrences use the new values; ones already recorded keep theirs.
+export const updateExpense = async (
+  id: number,
+  item: string,
+  amount: number,
+  categoryId: number | null
+): Promise<boolean> => {
+  if (!validateEdit(item, "Item name", amount)) return false
+  return (
+    (await safeDatabaseOperation(async (db) => {
+      await db.runAsync(
+        `UPDATE expenses SET item = ?, amount = ?, category_id = ? WHERE id = ?;`,
+        [item.trim(), amount, categoryId, id]
+      )
+      return true
+    })) || false
+  )
+}
+
 // Stop a recurring income or expense from being added again in future months
 export const stopRecurring = async (
   table: "income" | "expenses",

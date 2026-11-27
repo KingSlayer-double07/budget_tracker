@@ -490,3 +490,77 @@ describe("expense categories", () => {
     ])
   })
 })
+
+describe("editing entries", () => {
+  it("changes an expense's name, amount and category but not its date", async () => {
+    await insertExpense("Grocries", 5000, "2026-11-20")
+    const [before] = await allRows("expenses")
+    const food = (await database.getCategories()).find(
+      (c) => c.name === "Food & Groceries"
+    )!.id
+
+    expect(await database.updateExpense(before.id, " Groceries ", 5500, food)).toBe(
+      true
+    )
+    const [after] = (await database.getExpenses()) as any[]
+    expect(after).toMatchObject({
+      item: "Groceries",
+      amount: 5500,
+      date: "2026-11-20",
+      category_name: "Food & Groceries",
+    })
+
+    expect(await database.updateExpense(before.id, "Groceries", 5500, null)).toBe(
+      true
+    )
+    expect((await allRows("expenses"))[0].category_id).toBeNull()
+  })
+
+  it("changes an income entry's source and amount", async () => {
+    await database.addIncome("Salry", 300000, false, "")
+    const [income] = await allRows("income")
+    expect(await database.updateIncome(income.id, "Salary", 320000)).toBe(true)
+    expect((await allRows("income"))[0]).toMatchObject({
+      source: "Salary",
+      amount: 320000,
+    })
+  })
+
+  it("rejects invalid edits without changing the entry", async () => {
+    await database.addIncome("Salary", 300000, false, "")
+    const [income] = await allRows("income")
+    expect(await database.updateIncome(income.id, "  ", 1000)).toBe(false)
+    expect(await database.updateIncome(income.id, "Salary", -5)).toBe(false)
+    expect(await database.updateIncome(income.id, "Salary", NaN)).toBe(false)
+    expect((await allRows("income"))[0]).toMatchObject({
+      source: "Salary",
+      amount: 300000,
+    })
+    expect(alertSpy).toHaveBeenCalledTimes(3)
+  })
+
+  it("uses an edited repeating expense for later occurrences only", async () => {
+    setToday(new Date(2026, 8, 5, 9)) // set up on 5 Sep, due on the 5th
+    await database.addExpense("Gym", 15000, true, "5")
+
+    setToday(new Date(2026, 9, 5, 9)) // 5 Oct occurrence at the old price
+    await database.handleRecurringUpdates()
+
+    const [template] = await allRows("expenses")
+    await database.updateExpense(template.id, "Gym membership", 18000, null)
+
+    setToday(new Date(2026, 10, 5, 9)) // 5 Nov occurrence at the new price
+    await database.handleRecurringUpdates()
+
+    const rows = (await allRows("expenses")).map((row) => [
+      row.item,
+      row.amount,
+      row.date,
+    ])
+    expect(rows).toEqual([
+      ["Gym membership", 18000, "2026-09-05"],
+      ["Gym", 15000, "2026-10-05"],
+      ["Gym membership", 18000, "2026-11-05"],
+    ])
+  })
+})

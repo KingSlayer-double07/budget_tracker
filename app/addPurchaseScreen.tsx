@@ -1,9 +1,9 @@
 import React, { useState } from "react"
 import { ScrollView, Alert } from "react-native"
 import { useRouter } from "expo-router"
-import { useBudget } from "./context/BudgetContext"
-import { NotificationService } from "./services/NotificationService"
-import { Button, Card, ErrorState, Field, LoadingState } from "./components/ui"
+import { useBudget } from "../context/BudgetContext"
+import { NotificationService } from "../services/NotificationService"
+import { Button, Card, ErrorState, Field, LoadingState } from "../components/ui"
 import { formatNaira, makeStyles } from "../theme"
 
 export default function AddPurchaseScreen() {

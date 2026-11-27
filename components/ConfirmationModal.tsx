@@ -1,7 +1,7 @@
 import React from "react"
 import { Modal, View, Text } from "react-native"
 import { Button } from "./ui"
-import { makeStyles } from "../../theme"
+import { makeStyles } from "../theme"
 
 interface ConfirmationModalProps {
   visible: boolean

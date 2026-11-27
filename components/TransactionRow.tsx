@@ -2,7 +2,7 @@ import React from "react"
 import { Pressable, Text, View } from "react-native"
 import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable"
 import { Ionicons } from "@expo/vector-icons"
-import { formatDate, formatNaira, makeStyles, useTheme } from "../../theme"
+import { formatDate, formatNaira, makeStyles, useTheme } from "../theme"
 
 interface TransactionRowProps {
   title: string
@@ -11,6 +11,8 @@ interface TransactionRowProps {
   date: string
   // Day of month for recurring entries
   recurringDay?: string | null
+  // Amount later months record, when edited to differ from this entry
+  nextAmount?: number | null
   // Category label; muted when the expense has none
   tag?: { label: string; muted?: boolean }
   onPress?: () => void
@@ -26,6 +28,7 @@ export default function TransactionRow({
   kind,
   date,
   recurringDay,
+  nextAmount,
   tag,
   onPress,
   onLongPress,
@@ -55,7 +58,12 @@ export default function TransactionRow({
                 size={13}
                 color={colors.textMuted}
               />
-              <Text style={styles.metaText}>Monthly, day {recurringDay}</Text>
+              <Text style={styles.metaText}>
+                Monthly, day {recurringDay}
+                {nextAmount != null &&
+                  nextAmount !== amount &&
+                  ` · next ${formatNaira(nextAmount)}`}
+              </Text>
             </View>
           )}
         </View>

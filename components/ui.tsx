@@ -10,7 +10,7 @@ import {
   View,
   ViewStyle,
 } from "react-native"
-import { makeStyles, useTheme } from "../../theme"
+import { makeStyles, useTheme } from "../theme"
 
 export function Card({
   children,

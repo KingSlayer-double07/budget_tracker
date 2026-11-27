@@ -1,8 +1,8 @@
 import * as SQLite from "expo-sqlite"
 import * as FileSystem from "expo-file-system"
 import { Alert } from "react-native"
-import { SecureStorageService } from "./services/SecureStorageService"
-import { NotificationService } from "./services/NotificationService"
+import { SecureStorageService } from "./SecureStorageService"
+import { NotificationService } from "./NotificationService"
 
 // Database types
 interface Income {
@@ -13,6 +13,10 @@ interface Income {
   is_recurring: number
   recurring_date: string | null
   last_processed: string | null
+  // Values later occurrences use when a repeating entry was edited for
+  // future months only; set whenever next_amount is not null
+  next_name: string | null
+  next_amount: number | null
 }
 
 interface Expense {
@@ -24,6 +28,9 @@ interface Expense {
   recurring_date: string | null
   last_processed: string | null
   category_id: number | null
+  next_name: string | null
+  next_amount: number | null
+  next_category_id: number | null
 }
 
 export interface Category {
@@ -287,6 +294,26 @@ export const initializeDatabase = async (): Promise<boolean> => {
     )
     if (!categoryColumn) {
       await db.execAsync("ALTER TABLE expenses ADD COLUMN category_id INTEGER;")
+    }
+
+    // Future-month values for repeating entries, so editing what later months
+    // record doesn't rewrite the month the entry was first added in
+    const nextColumns: [string, string][] = [
+      ["income", "next_name TEXT"],
+      ["income", "next_amount REAL"],
+      ["expenses", "next_name TEXT"],
+      ["expenses", "next_amount REAL"],
+      ["expenses", "next_category_id INTEGER"],
+    ]
+    for (const [table, definition] of nextColumns) {
+      const name = definition.split(" ")[0]
+      const column = await db.getFirstAsync(
+        `SELECT name FROM pragma_table_info('${table}') WHERE name = ?`,
+        [name]
+      )
+      if (!column) {
+        await db.execAsync(`ALTER TABLE ${table} ADD COLUMN ${definition};`)
+      }
     }
 
     isInitialized = true
@@ -727,6 +754,99 @@ export const deleteExpense = async (key: number): Promise<boolean> => {
   )
 }
 
+// Validate an edited name and amount, alerting on the first problem
+const validateEdit = (name: string, nameLabel: string, amount: number) => {
+  for (const result of [validateString(name, nameLabel), validateAmount(amount)]) {
+    if (!result.isValid) {
+      Alert.alert("Validation Error", result.error)
+      return false
+    }
+  }
+  return true
+}
+
+// What an edit to an entry changes:
+// - "entry": the entry itself; if it repeats, later months follow it too
+// - "future": only what a repeating entry records in later months, so the
+//   month it was first added in (the entry itself) keeps its values
+export type EditScope = "entry" | "future"
+
+// Change an income entry's source and amount
+export const updateIncome = async (
+  id: number,
+  source: string,
+  amount: number,
+  scope: EditScope = "entry"
+): Promise<boolean> => {
+  if (!validateEdit(source, "Source", amount)) return false
+  return (
+    (await safeDatabaseOperation(async (db) => {
+      const entry = await db.getFirstAsync<Income>(
+        "SELECT * FROM income WHERE id = ?",
+        [id]
+      )
+      if (!entry) return false
+      const name = source.trim()
+      if (scope === "future" && entry.is_recurring) {
+        // Matching the entry again means later months simply follow it
+        const same = name === entry.source && amount === entry.amount
+        await db.runAsync(
+          "UPDATE income SET next_name = ?, next_amount = ? WHERE id = ?",
+          [same ? null : name, same ? null : amount, id]
+        )
+      } else {
+        await db.runAsync(
+          `UPDATE income SET source = ?, amount = ?, next_name = NULL,
+           next_amount = NULL WHERE id = ?`,
+          [name, amount, id]
+        )
+      }
+      return true
+    })) || false
+  )
+}
+
+// Change an expense's name, amount and category
+export const updateExpense = async (
+  id: number,
+  item: string,
+  amount: number,
+  categoryId: number | null,
+  scope: EditScope = "entry"
+): Promise<boolean> => {
+  if (!validateEdit(item, "Item name", amount)) return false
+  return (
+    (await safeDatabaseOperation(async (db) => {
+      const entry = await db.getFirstAsync<Expense>(
+        "SELECT * FROM expenses WHERE id = ?",
+        [id]
+      )
+      if (!entry) return false
+      const name = item.trim()
+      if (scope === "future" && entry.is_recurring) {
+        // Matching the entry again means later months simply follow it
+        const same =
+          name === entry.item &&
+          amount === entry.amount &&
+          categoryId === entry.category_id
+        await db.runAsync(
+          `UPDATE expenses SET next_name = ?, next_amount = ?,
+           next_category_id = ? WHERE id = ?`,
+          same ? [null, null, null, id] : [name, amount, categoryId, id]
+        )
+      } else {
+        await db.runAsync(
+          `UPDATE expenses SET item = ?, amount = ?, category_id = ?,
+           next_name = NULL, next_amount = NULL, next_category_id = NULL
+           WHERE id = ?`,
+          [name, amount, categoryId, id]
+        )
+      }
+      return true
+    })) || false
+  )
+}
+
 // Stop a recurring income or expense from being added again in future months
 export const stopRecurring = async (
   table: "income" | "expenses",
@@ -735,7 +855,8 @@ export const stopRecurring = async (
   return (
     (await safeDatabaseOperation(async (db) => {
       await db.runAsync(
-        `UPDATE ${table} SET is_recurring = 0, recurring_date = NULL WHERE id = ?;`,
+        `UPDATE ${table} SET is_recurring = 0, recurring_date = NULL,
+         next_name = NULL, next_amount = NULL WHERE id = ?;`,
         [id]
       )
       return true
@@ -754,9 +875,12 @@ export const stopRecurringByName = async (
   return (
     (await safeDatabaseOperation(async (db) => {
       await db.runAsync(
-        `UPDATE ${table} SET is_recurring = 0, recurring_date = NULL
-         WHERE is_recurring = 1 AND ${nameColumn} = ? AND recurring_date = ?;`,
-        [name, recurringDay]
+        `UPDATE ${table} SET is_recurring = 0, recurring_date = NULL,
+         next_name = NULL, next_amount = NULL
+         WHERE is_recurring = 1 AND recurring_date = ?
+           AND (CASE WHEN next_amount IS NOT NULL THEN next_name
+                ELSE ${nameColumn} END) = ?;`,
+        [recurringDay, name]
       )
       return true
     })) || false
@@ -830,18 +954,24 @@ const processRecurringTable = async (
       if (latest?.date && latest.date > after) after = latest.date
     }
 
+    // Values edited for future months only take over from the entry's own
+    const edited = entry.next_amount !== null && entry.next_amount !== undefined
+    const nextName = edited ? entry.next_name ?? name : name
+    const nextAmount = edited ? entry.next_amount! : entry.amount
+    const nextCategory = edited ? entry.next_category_id : entry.category_id
+
     for (const due of dueDatesBetween(dayOfMonth, after, today)) {
       // Occurrences are plain entries so only the original keeps recurring;
-      // expense occurrences keep the original's category
+      // expense occurrences keep the category in effect
       if (table === "expenses") {
         await database.runAsync(
           "INSERT INTO expenses (item, amount, date, is_recurring, recurring_date, category_id) VALUES (?, ?, ?, 0, NULL, ?)",
-          [name, entry.amount, due, entry.category_id ?? null]
+          [nextName, nextAmount, due, nextCategory ?? null]
         )
       } else {
         await database.runAsync(
           "INSERT INTO income (source, amount, date, is_recurring, recurring_date) VALUES (?, ?, ?, 0, NULL)",
-          [name, entry.amount, due]
+          [nextName, nextAmount, due]
         )
       }
     }
@@ -939,6 +1069,10 @@ export const deleteCategory = async (id: number): Promise<boolean> => {
       try {
         await db.runAsync(
           "UPDATE expenses SET category_id = NULL WHERE category_id = ?",
+          [id]
+        )
+        await db.runAsync(
+          "UPDATE expenses SET next_category_id = NULL WHERE next_category_id = ?",
           [id]
         )
         await db.runAsync("DELETE FROM categories WHERE id = ?", [id])

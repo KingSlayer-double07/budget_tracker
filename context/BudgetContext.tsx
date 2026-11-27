@@ -27,13 +27,16 @@ import {
   addCategory,
   renameCategory,
   deleteCategory,
-  setExpenseCategory,
+  // setExpenseCategory, (see changeExpenseCategory below)
+  updateIncome,
+  updateExpense,
+  EditScope,
   Category,
   CategoryTotal,
   getMonthlyIncome,
   getMonthlyExpenses,
   BUDGET_THRESHOLD_KEY,
-} from "../database"
+} from "../services/database"
 import { SecureStorageService } from "../services/SecureStorageService"
 
 interface BudgetContextType {
@@ -79,9 +82,24 @@ interface BudgetContextType {
   addNewCategory: (name: string) => Promise<boolean>
   renameExistingCategory: (id: number, name: string) => Promise<boolean>
   removeCategory: (id: number) => Promise<boolean>
-  changeExpenseCategory: (
-    expenseId: number,
-    categoryId: number | null
+  // Unused since expenses are edited with editExpense, which also sets the
+  // category
+  // changeExpenseCategory: (
+  //   expenseId: number,
+  //   categoryId: number | null
+  // ) => Promise<boolean>
+  editIncome: (
+    id: number,
+    source: string,
+    amount: number,
+    scope?: EditScope
+  ) => Promise<boolean>
+  editExpense: (
+    id: number,
+    item: string,
+    amount: number,
+    categoryId: number | null,
+    scope?: EditScope
   ) => Promise<boolean>
 }
 
@@ -291,8 +309,22 @@ export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({
   const renameExistingCategory = (id: number, name: string) =>
     refreshAfter(renameCategory(id, name))
   const removeCategory = (id: number) => refreshAfter(deleteCategory(id))
-  const changeExpenseCategory = (expenseId: number, categoryId: number | null) =>
-    refreshAfter(setExpenseCategory(expenseId, categoryId))
+  // Unused since expenses are edited with editExpense
+  // const changeExpenseCategory = (expenseId: number, categoryId: number | null) =>
+  //   refreshAfter(setExpenseCategory(expenseId, categoryId))
+  const editIncome = (
+    id: number,
+    source: string,
+    amount: number,
+    scope?: EditScope
+  ) => refreshAfter(updateIncome(id, source, amount, scope))
+  const editExpense = (
+    id: number,
+    item: string,
+    amount: number,
+    categoryId: number | null,
+    scope?: EditScope
+  ) => refreshAfter(updateExpense(id, item, amount, categoryId, scope))
 
   return (
     <BudgetContext.Provider
@@ -322,7 +354,9 @@ export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({
         addNewCategory,
         renameExistingCategory,
         removeCategory,
-        changeExpenseCategory,
+        // changeExpenseCategory,
+        editIncome,
+        editExpense,
       }}>
       {children}
     </BudgetContext.Provider>

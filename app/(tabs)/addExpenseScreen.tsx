@@ -1,19 +1,18 @@
 import React, { useState } from "react"
 import { View, Text, Switch, FlatList, Alert, Pressable } from "react-native"
-import { useBudget } from "../context/BudgetContext"
+import { useBudget } from "../../context/BudgetContext"
 import {
   stopRecurring,
   getNextDueDate,
   clearExpensesTable,
   UNCATEGORIZED,
-} from "../database"
-import { NotificationService } from "../services/NotificationService"
-import ConfirmationModal from "../components/ConfirmationModal"
-import {
-  CategoryChips,
-  CategoryPickerModal,
-} from "../components/CategoryPicker"
-import TransactionRow from "../components/TransactionRow"
+  EditScope,
+} from "../../services/database"
+import { NotificationService } from "../../services/NotificationService"
+import ConfirmationModal from "../../components/ConfirmationModal"
+import { CategoryChips } from "../../components/CategoryPicker"
+import EditEntryModal, { EntryValues } from "../../components/EditEntryModal"
+import TransactionRow from "../../components/TransactionRow"
 import {
   Button,
   Card,
@@ -22,7 +21,7 @@ import {
   Field,
   LoadingState,
   SectionTitle,
-} from "../components/ui"
+} from "../../components/ui"
 import { formatNaira, makeStyles, useTheme } from "../../theme"
 
 interface ExpenseEntry {
@@ -34,7 +33,29 @@ interface ExpenseEntry {
   recurring_date: string | null
   category_id: number | null
   category_name: string | null
+  // Set when a repeating expense was edited for future months only
+  next_name: string | null
+  next_amount: number | null
+  next_category_id: number | null
 }
+
+// What a repeating expense records in later months
+const futureValues = (expense: ExpenseEntry): EntryValues =>
+  expense.next_amount !== null
+    ? {
+        name: expense.next_name ?? expense.item,
+        amount: expense.next_amount,
+        categoryId: expense.next_category_id,
+      }
+    : {
+        name: expense.item,
+        amount: expense.amount,
+        categoryId: expense.category_id,
+      }
+
+// The monthly reminder is keyed by the name later months record
+const reminderId = (name: string, day: string | null) =>
+  `recurring-expense-${name}-${day}`
 
 export default function AddExpenseScreen() {
   const [description, setDescription] = useState("")
@@ -42,10 +63,8 @@ export default function AddExpenseScreen() {
   const [isRecurring, setIsRecurring] = useState(false)
   const [recurringDate, setRecurringDate] = useState("")
   const [categoryId, setCategoryId] = useState<number | null>(null)
-  // Expense whose category is being changed from the history list
-  const [recategorizing, setRecategorizing] = useState<ExpenseEntry | null>(
-    null
-  )
+  // Expense being edited from the history list
+  const [editing, setEditing] = useState<ExpenseEntry | null>(null)
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [selectedExpense, setSelectedExpense] = useState<ExpenseEntry | null>(
     null
@@ -58,7 +77,7 @@ export default function AddExpenseScreen() {
     refreshData,
     deleteSelectedExpense,
     categories,
-    changeExpenseCategory,
+    editExpense,
   } = useBudget()
   const styles = useStyles()
   const { colors } = useTheme()
@@ -96,7 +115,7 @@ export default function AddExpenseScreen() {
             "Recurring Expense Due",
             `Your recurring expense of ${formatNaira(numAmount)} for ${description} is due next on ${nextDate.toLocaleDateString()}`,
             nextDate,
-            `recurring-expense-${description}-${recurringDate}`,
+            reminderId(description.trim(), recurringDate),
             description,
             {
               table: "expenses",
@@ -176,7 +195,10 @@ export default function AddExpenseScreen() {
       const notificationService = NotificationService.getInstance()
       await notificationService.cancelFutureOccurrences(
         selectedExpense.item,
-        `recurring-expense-${selectedExpense.item}-${selectedExpense.recurring_date}`
+        reminderId(
+          futureValues(selectedExpense).name,
+          selectedExpense.recurring_date
+        )
       )
       setShowCancelModal(false)
       setSelectedExpense(null)
@@ -185,14 +207,41 @@ export default function AddExpenseScreen() {
     }
   }
 
-  const handleChangeCategory = async (newCategoryId: number | null) => {
-    if (!recategorizing) return
-    const expense = recategorizing
-    setRecategorizing(null)
-    if (newCategoryId === expense.category_id) return
-    const success = await changeExpenseCategory(expense.id, newCategoryId)
+  const handleSaveEdit = async (values: EntryValues, scope: EditScope) => {
+    if (!editing) return
+    const expense = editing
+    const success = await editExpense(
+      expense.id,
+      values.name,
+      values.amount,
+      values.categoryId,
+      scope
+    )
     if (!success) {
-      Alert.alert("Error", "Failed to change the category")
+      Alert.alert("Error", "Failed to save the changes. Please try again.")
+      return
+    }
+    setEditing(null)
+
+    // Keep the monthly reminder in step with the name later months record
+    const oldName = futureValues(expense).name
+    if (expense.is_recurring && expense.recurring_date && oldName !== values.name) {
+      try {
+        await NotificationService.getInstance().renameRecurringReminder(
+          reminderId(oldName, expense.recurring_date),
+          "Recurring Expense Due",
+          getNextDueDate(parseInt(expense.recurring_date)),
+          reminderId(values.name, expense.recurring_date),
+          values.name,
+          {
+            table: "expenses",
+            name: values.name,
+            recurringDay: expense.recurring_date,
+          }
+        )
+      } catch (error) {
+        console.error("Failed to update the reminder:", error)
+      }
     }
   }
 
@@ -279,8 +328,8 @@ export default function AddExpenseScreen() {
       />
       {expenseList.length > 0 && (
         <Text style={styles.hint}>
-          Tap to change category · Hold a repeating expense to stop it · Swipe
-          left to delete
+          Tap to edit · Hold a repeating expense to stop it · Swipe left to
+          delete
         </Text>
       )}
     </View>
@@ -302,24 +351,33 @@ export default function AddExpenseScreen() {
             kind="expense"
             date={item.date}
             recurringDay={item.is_recurring ? item.recurring_date : null}
+            nextAmount={item.is_recurring ? item.next_amount : null}
             tag={{
               label: item.category_name ?? UNCATEGORIZED,
               muted: !item.category_name,
             }}
-            onPress={() => setRecategorizing(item)}
+            onPress={() => setEditing(item)}
             onLongPress={() => handleLongPress(item)}
             onDelete={() => handleDelete(item)}
           />
         )}
       />
 
-      <CategoryPickerModal
-        visible={recategorizing !== null}
-        title={`Category for "${recategorizing?.item ?? ""}"`}
+      <EditEntryModal
+        visible={editing !== null}
+        title="Edit Expense"
+        nameLabel="What did you spend on?"
+        initial={{
+          name: editing?.item ?? "",
+          amount: editing?.amount ?? 0,
+          categoryId: editing?.category_id ?? null,
+        }}
+        future={
+          editing?.is_recurring ? futureValues(editing) : undefined
+        }
         categories={categories}
-        selectedId={recategorizing?.category_id ?? null}
-        onSelect={handleChangeCategory}
-        onCancel={() => setRecategorizing(null)}
+        onSave={handleSaveEdit}
+        onCancel={() => setEditing(null)}
       />
 
       <ConfirmationModal

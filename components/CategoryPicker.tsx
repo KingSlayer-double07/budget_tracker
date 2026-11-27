@@ -1,9 +1,11 @@
 import React from "react"
-import { Modal, Pressable, ScrollView, Text, View } from "react-native"
-import { Category, UNCATEGORIZED } from "../database"
-import { Button } from "./ui"
-import { useModalStyles } from "./ConfirmationModal"
-import { makeStyles } from "../../theme"
+import { Pressable, ScrollView, Text, View } from "react-native"
+import { Category, UNCATEGORIZED } from "../services/database"
+// Only needed by CategoryPickerModal below
+// import { Modal } from "react-native"
+// import { Button } from "./ui"
+// import { useModalStyles } from "./ConfirmationModal"
+import { makeStyles } from "../theme"
 
 interface CategoryChipsProps {
   categories: Category[]
@@ -60,55 +62,57 @@ export function CategoryChips({
   )
 }
 
-interface CategoryPickerModalProps {
-  visible: boolean
-  title: string
-  categories: Category[]
-  selectedId: number | null
-  onSelect: (categoryId: number | null) => void
-  onCancel: () => void
-}
-
-// Modal for changing the category of an existing expense
-export function CategoryPickerModal({
-  visible,
-  title,
-  categories,
-  selectedId,
-  onSelect,
-  onCancel,
-}: CategoryPickerModalProps) {
-  const modalStyles = useModalStyles()
-  const styles = useStyles()
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onCancel}>
-      <View style={modalStyles.overlay}>
-        <View style={[modalStyles.content, styles.modalContent]}>
-          <Text style={modalStyles.title}>{title}</Text>
-          <ScrollView style={styles.modalScroll}>
-            <CategoryChips
-              categories={categories}
-              selectedId={selectedId}
-              onSelect={onSelect}
-              layout="wrap"
-            />
-          </ScrollView>
-          <View style={[modalStyles.buttons, styles.modalButtons]}>
-            <Button
-              title="Cancel"
-              variant="ghost"
-              onPress={onCancel}
-            />
-          </View>
-        </View>
-      </View>
-    </Modal>
-  )
-}
+// Unused since tapping an expense opens EditEntryModal, which includes the
+// category chips
+// interface CategoryPickerModalProps {
+//   visible: boolean
+//   title: string
+//   categories: Category[]
+//   selectedId: number | null
+//   onSelect: (categoryId: number | null) => void
+//   onCancel: () => void
+// }
+//
+// // Modal for changing the category of an existing expense
+// export function CategoryPickerModal({
+//   visible,
+//   title,
+//   categories,
+//   selectedId,
+//   onSelect,
+//   onCancel,
+// }: CategoryPickerModalProps) {
+//   const modalStyles = useModalStyles()
+//   const styles = useStyles()
+//   return (
+//     <Modal
+//       visible={visible}
+//       transparent
+//       animationType="fade"
+//       onRequestClose={onCancel}>
+//       <View style={modalStyles.overlay}>
+//         <View style={[modalStyles.content, styles.modalContent]}>
+//           <Text style={modalStyles.title}>{title}</Text>
+//           <ScrollView style={styles.modalScroll}>
+//             <CategoryChips
+//               categories={categories}
+//               selectedId={selectedId}
+//               onSelect={onSelect}
+//               layout="wrap"
+//             />
+//           </ScrollView>
+//           <View style={[modalStyles.buttons, styles.modalButtons]}>
+//             <Button
+//               title="Cancel"
+//               variant="ghost"
+//               onPress={onCancel}
+//             />
+//           </View>
+//         </View>
+//       </View>
+//     </Modal>
+//   )
+// }
 
 const useStyles = makeStyles(({ colors, spacing, radius, font }) => ({
   row: {
@@ -143,13 +147,14 @@ const useStyles = makeStyles(({ colors, spacing, radius, font }) => ({
     color: colors.onPrimary,
     fontWeight: "600",
   },
-  modalContent: {
-    maxHeight: "75%",
-  },
-  modalScroll: {
-    flexGrow: 0,
-  },
-  modalButtons: {
-    marginTop: spacing.lg,
-  },
+  // Used by the commented-out CategoryPickerModal
+  // modalContent: {
+  //   maxHeight: "75%",
+  // },
+  // modalScroll: {
+  //   flexGrow: 0,
+  // },
+  // modalButtons: {
+  //   marginTop: spacing.lg,
+  // },
 }))

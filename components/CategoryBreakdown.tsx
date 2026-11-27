@@ -35,7 +35,7 @@ export default function CategoryBreakdown({
       </Text>
 
       {rows.length === 0 ? (
-        <Text style={styles.empty}>No expenses recorded this month.</Text>
+        <Text style={styles.empty}>No expenses recorded in {monthLabel}.</Text>
       ) : (
         rows.map((row) => {
           const share = monthTotal > 0 ? row.total / monthTotal : 0

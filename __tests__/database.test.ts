@@ -150,6 +150,24 @@ describe("getMonthlyExpenses", () => {
   })
 })
 
+describe("getMonthlyIncome", () => {
+  it("only counts the current month", async () => {
+    const db = await database.getDatabase()
+    for (const [source, amount, date] of [
+      ["October salary", 300000, "2026-10-25"],
+      ["Salary", 300000, "2026-11-25"],
+      ["Side gig", 45000, "2026-11-02"],
+    ] as const) {
+      await db.runAsync(
+        "INSERT INTO income (source, amount, date) VALUES (?, ?, ?)",
+        [source, amount, date]
+      )
+    }
+    expect(await database.getMonthlyIncome()).toBe(345000)
+    expect(await database.getMonthlyIncome(new Date(2026, 9, 1))).toBe(300000)
+  })
+})
+
 describe("checkBudgetThreshold", () => {
   const setThreshold = (value: string) =>
     require("expo-secure-store").__store.set("budget_threshold", value)

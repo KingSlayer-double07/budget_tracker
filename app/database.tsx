@@ -550,7 +550,23 @@ export const getMonthlyExpenses = async (
   )
 }
 
-const BUDGET_THRESHOLD_KEY = "budget_threshold"
+// Total income recorded in the given month (defaults to the current month)
+export const getMonthlyIncome = async (
+  month: Date = new Date()
+): Promise<number> => {
+  const monthPrefix = toLocalDateString(month).slice(0, 7) // YYYY-MM
+  return (
+    (await safeDatabaseOperation(async (db) => {
+      const result = await db.getFirstAsync<DatabaseResult>(
+        `SELECT SUM(amount) as total FROM income WHERE date LIKE ?;`,
+        [`${monthPrefix}%`]
+      )
+      return result?.total || 0
+    })) || 0
+  )
+}
+
+export const BUDGET_THRESHOLD_KEY = "budget_threshold"
 // Month (YYYY-MM) in which the budget alert last fired, so it fires once per month
 export const BUDGET_ALERT_MONTH_KEY = "budget_alert_month"
 

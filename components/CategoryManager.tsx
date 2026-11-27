@@ -1,9 +1,9 @@
 import React, { useState } from "react"
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native"
 import { useBudget } from "../context/BudgetContext"
-import { Category } from "../database"
+import { Category } from "../services/database"
 import { Button, Card } from "./ui"
-import { makeStyles, useTheme } from "../../theme"
+import { makeStyles, useTheme } from "../theme"
 
 // Settings section for adding, renaming and removing expense categories
 export default function CategoryManager() {

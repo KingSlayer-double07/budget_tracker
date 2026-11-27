@@ -1,16 +1,16 @@
 import React, { useEffect, useState } from "react"
 import { ScrollView, View, Text, Switch, Alert, Pressable } from "react-native"
-import { AuthenticationService } from "./services/AuthenticationService"
-import { SecureStorageService } from "./services/SecureStorageService"
-import { useBudget } from "./context/BudgetContext"
+import { AuthenticationService } from "../services/AuthenticationService"
+import { SecureStorageService } from "../services/SecureStorageService"
+import { useBudget } from "../context/BudgetContext"
 import {
   clearAllData,
   checkBudgetThreshold,
   BUDGET_ALERT_MONTH_KEY,
-} from "./database"
-import { useAuth } from "./context/AuthContext"
-import CategoryManager from "./components/CategoryManager"
-import { Button, Card, Field } from "./components/ui"
+} from "../services/database"
+import { useAuth } from "../context/AuthContext"
+import CategoryManager from "../components/CategoryManager"
+import { Button, Card, Field } from "../components/ui"
 import { makeStyles, useTheme } from "../theme"
 
 export default function SettingsScreen() {

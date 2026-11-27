@@ -1,9 +1,9 @@
 import React from "react"
 import { Modal, Pressable, ScrollView, Text, View } from "react-native"
-import { Category, UNCATEGORIZED } from "../database"
+import { Category, UNCATEGORIZED } from "../services/database"
 import { Button } from "./ui"
 import { useModalStyles } from "./ConfirmationModal"
-import { makeStyles } from "../../theme"
+import { makeStyles } from "../theme"
 
 interface CategoryChipsProps {
   categories: Category[]

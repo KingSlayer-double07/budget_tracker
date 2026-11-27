@@ -1,8 +1,8 @@
 import React from "react"
 import { Text, View } from "react-native"
-import { CategoryTotal } from "../database"
+import { CategoryTotal } from "../services/database"
 import { Card } from "./ui"
-import { formatNaira, makeStyles } from "../../theme"
+import { formatNaira, makeStyles } from "../theme"
 
 interface CategoryBreakdownProps {
   totals: CategoryTotal[]

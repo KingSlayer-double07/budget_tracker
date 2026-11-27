@@ -2,10 +2,10 @@ import React, { useMemo } from "react"
 import { View, Text, ScrollView, RefreshControl, Pressable } from "react-native"
 import { useRouter } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
-import { useBudget } from "../context/BudgetContext"
-import { UNCATEGORIZED } from "../database"
-import CategoryBreakdown from "../components/CategoryBreakdown"
-import TransactionRow from "../components/TransactionRow"
+import { useBudget } from "../../context/BudgetContext"
+import { UNCATEGORIZED } from "../../services/database"
+import CategoryBreakdown from "../../components/CategoryBreakdown"
+import TransactionRow from "../../components/TransactionRow"
 import {
   Button,
   Card,
@@ -13,7 +13,7 @@ import {
   ErrorState,
   LoadingState,
   SectionTitle,
-} from "../components/ui"
+} from "../../components/ui"
 import { formatNaira, makeStyles, useTheme } from "../../theme"
 
 const RECENT_COUNT = 5

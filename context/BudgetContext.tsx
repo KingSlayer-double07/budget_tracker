@@ -33,7 +33,7 @@ import {
   getMonthlyIncome,
   getMonthlyExpenses,
   BUDGET_THRESHOLD_KEY,
-} from "../database"
+} from "../services/database"
 import { SecureStorageService } from "../services/SecureStorageService"
 
 interface BudgetContextType {

@@ -1,8 +1,8 @@
 import * as SQLite from "expo-sqlite"
 import * as FileSystem from "expo-file-system"
 import { Alert } from "react-native"
-import { SecureStorageService } from "./services/SecureStorageService"
-import { NotificationService } from "./services/NotificationService"
+import { SecureStorageService } from "./SecureStorageService"
+import { NotificationService } from "./NotificationService"
 
 // Database types
 interface Income {

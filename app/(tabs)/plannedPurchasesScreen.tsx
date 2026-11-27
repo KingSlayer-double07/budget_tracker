@@ -3,15 +3,15 @@ import { View, Text, FlatList, Alert, Pressable } from "react-native"
 import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
-import { useBudget } from "../context/BudgetContext"
-import { clearPlannedPurchasesTable } from "../database"
-import InputModal from "../components/InputModal"
+import { useBudget } from "../../context/BudgetContext"
+import { clearPlannedPurchasesTable } from "../../services/database"
+import InputModal from "../../components/InputModal"
 import {
   Button,
   ErrorState,
   LoadingState,
   SectionTitle,
-} from "../components/ui"
+} from "../../components/ui"
 import { formatDate, formatNaira, makeStyles, useTheme } from "../../theme"
 
 interface PlannedPurchase {

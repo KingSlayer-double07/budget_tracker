@@ -1,4 +1,4 @@
-import { groupDataByTimeframe } from "../app/components/TrendGraph"
+import { groupDataByTimeframe } from "../components/TrendGraph"
 
 const expenses = [
   { amount: 500, date: "2026-11-20" },

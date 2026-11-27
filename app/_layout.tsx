@@ -6,20 +6,20 @@ import {
 } from "expo-router"
 import { useEffect, useState } from "react"
 import * as Notifications from "expo-notifications"
-import { initializeDatabase, stopRecurringByName } from "./database"
-import { BudgetProvider } from "./context/BudgetContext"
-import { AuthProvider, useAuth } from "./context/AuthContext"
+import { initializeDatabase, stopRecurringByName } from "../services/database"
+import { BudgetProvider } from "../context/BudgetContext"
+import { AuthProvider, useAuth } from "../context/AuthContext"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { StatusBar } from "expo-status-bar"
 import { View, Text, AppState } from "react-native"
 import { makeStyles, useTheme } from "../theme"
-import { Button, LoadingState } from "./components/ui"
+import { Button, LoadingState } from "../components/ui"
 import {
   NotificationService,
   CANCEL_FUTURE_ACTION,
-} from "./services/NotificationService"
-import { PasscodeModal } from "./components/PasscodeModal"
-import { TransactionsProvider } from "./context/TransactionsContext"
+} from "../services/NotificationService"
+import { PasscodeModal } from "../components/PasscodeModal"
+import { TransactionsProvider } from "../context/TransactionsContext"
 
 function AppContent() {
   const [isLoading, setIsLoading] = useState(true)

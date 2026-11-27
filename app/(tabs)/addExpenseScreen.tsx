@@ -1,19 +1,19 @@
 import React, { useState } from "react"
 import { View, Text, Switch, FlatList, Alert, Pressable } from "react-native"
-import { useBudget } from "../context/BudgetContext"
+import { useBudget } from "../../context/BudgetContext"
 import {
   stopRecurring,
   getNextDueDate,
   clearExpensesTable,
   UNCATEGORIZED,
-} from "../database"
-import { NotificationService } from "../services/NotificationService"
-import ConfirmationModal from "../components/ConfirmationModal"
+} from "../../services/database"
+import { NotificationService } from "../../services/NotificationService"
+import ConfirmationModal from "../../components/ConfirmationModal"
 import {
   CategoryChips,
   CategoryPickerModal,
-} from "../components/CategoryPicker"
-import TransactionRow from "../components/TransactionRow"
+} from "../../components/CategoryPicker"
+import TransactionRow from "../../components/TransactionRow"
 import {
   Button,
   Card,
@@ -22,7 +22,7 @@ import {
   Field,
   LoadingState,
   SectionTitle,
-} from "../components/ui"
+} from "../../components/ui"
 import { formatNaira, makeStyles, useTheme } from "../../theme"
 
 interface ExpenseEntry {

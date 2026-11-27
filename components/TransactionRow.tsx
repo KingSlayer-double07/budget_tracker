@@ -2,7 +2,7 @@ import React from "react"
 import { Pressable, Text, View } from "react-native"
 import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable"
 import { Ionicons } from "@expo/vector-icons"
-import { formatDate, formatNaira, makeStyles, useTheme } from "../../theme"
+import { formatDate, formatNaira, makeStyles, useTheme } from "../theme"
 
 interface TransactionRowProps {
   title: string

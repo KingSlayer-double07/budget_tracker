@@ -20,14 +20,14 @@ jest.mock("expo-secure-store", () => {
   }
 })
 
-jest.mock("../app/services/NotificationService", () => {
+jest.mock("../services/NotificationService", () => {
   const sendBudgetAlert = jest.fn(async () => {})
   return {
     NotificationService: { getInstance: () => ({ sendBudgetAlert }) },
   }
 })
 
-type Database = typeof import("../app/database")
+type Database = typeof import("../services/database")
 
 let database: Database
 let sendBudgetAlert: jest.Mock
@@ -70,8 +70,8 @@ beforeEach(async () => {
   require("expo-secure-store").__store.clear()
   alertSpy = jest.spyOn(require("react-native").Alert, "alert")
   alertSpy.mockImplementation(() => {})
-  database = require("../app/database")
-  sendBudgetAlert = require("../app/services/NotificationService")
+  database = require("../services/database")
+  sendBudgetAlert = require("../services/NotificationService")
     .NotificationService.getInstance().sendBudgetAlert
   await database.initializeDatabase()
 })
@@ -398,7 +398,7 @@ describe("expense categories", () => {
     const db = await database.getDatabase()
     jest.resetModules()
     require("expo-sqlite").openDatabaseAsync.mockResolvedValueOnce(db)
-    const restarted: Database = require("../app/database")
+    const restarted: Database = require("../services/database")
     await restarted.initializeDatabase()
 
     const names = (await restarted.getCategories()).map((c) => c.name)

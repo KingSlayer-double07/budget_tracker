@@ -1,11 +1,11 @@
 import React, { useContext } from "react"
 import { ScrollView } from "react-native"
-import TrendGraph from "../components/TrendGraph"
-import { Transaction } from "../components/TrendGraph"
-import CategoryBreakdown from "../components/CategoryBreakdown"
-import { EmptyState } from "../components/ui"
-import { TransactionsContext } from "../context/TransactionsContext"
-import { useBudget } from "../context/BudgetContext"
+import TrendGraph from "../../components/TrendGraph"
+import { Transaction } from "../../components/TrendGraph"
+import CategoryBreakdown from "../../components/CategoryBreakdown"
+import { EmptyState } from "../../components/ui"
+import { TransactionsContext } from "../../context/TransactionsContext"
+import { useBudget } from "../../context/BudgetContext"
 import { makeStyles } from "../../theme"
 
 export default function StatsScreen() {

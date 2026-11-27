@@ -2,7 +2,7 @@ import React, { useState } from "react"
 import { Modal, View, Text, TextInput } from "react-native"
 import { Button } from "./ui"
 import { useModalStyles } from "./ConfirmationModal"
-import { makeStyles, useTheme } from "../../theme"
+import { makeStyles, useTheme } from "../theme"
 
 interface PasscodeModalProps {
   visible: boolean

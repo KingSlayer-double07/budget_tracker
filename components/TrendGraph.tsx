@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react"
 import { LayoutChangeEvent, Pressable, Text, View } from "react-native"
 import { Circle, Line, Polyline, Svg, Text as SVGText } from "react-native-svg"
 import { Card } from "./ui"
-import { formatCompactNaira, makeStyles, useTheme } from "../../theme"
+import { formatCompactNaira, makeStyles, useTheme } from "../theme"
 
 export interface Transaction {
   amount: number

@@ -1,6 +1,5 @@
 import {
   Stack,
-  useRouter,
   DarkTheme,
   DefaultTheme,
   ThemeProvider,
@@ -11,20 +10,14 @@ import { initializeDatabase, stopRecurringByName } from "./database"
 import { BudgetProvider } from "./context/BudgetContext"
 import { AuthProvider, useAuth } from "./context/AuthContext"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
-import {
-  StyleSheet,
-  View,
-  ActivityIndicator,
-  Text,
-  TouchableOpacity,
-  AppState,
-  Alert,
-} from "react-native"
+import { StatusBar } from "expo-status-bar"
+import { View, Text, AppState } from "react-native"
+import { makeStyles, useTheme } from "../theme"
+import { Button, LoadingState } from "./components/ui"
 import {
   NotificationService,
   CANCEL_FUTURE_ACTION,
 } from "./services/NotificationService"
-//import { AuthenticationService } from './services/AuthenticationService';
 import { PasscodeModal } from "./components/PasscodeModal"
 import { TransactionsProvider } from "./context/TransactionsContext"
 
@@ -40,8 +33,23 @@ function AppContent() {
     handlePasscodeSubmit,
     setShowPasscodeModal,
   } = useAuth()
-  const router = useRouter()
   const [authenticated, setAuthenticated] = useState(false)
+  const theme = useTheme()
+  const styles = useStyles()
+
+  // Navigation colours (screen backgrounds, cards) follow the app theme
+  const baseNavigationTheme = theme.dark ? DarkTheme : DefaultTheme
+  const navigationTheme = {
+    ...baseNavigationTheme,
+    colors: {
+      ...baseNavigationTheme.colors,
+      primary: theme.colors.primary,
+      background: theme.colors.background,
+      card: theme.colors.surface,
+      text: theme.colors.text,
+      border: theme.colors.border,
+    },
+  }
 
   useEffect(() => {
     initializeApp()
@@ -141,95 +149,53 @@ function AppContent() {
   }
 
   if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator
-          size="large"
-          color="#043927"
-        />
-      </View>
-    )
+    return <LoadingState />
   }
 
   return (
     <GestureHandlerRootView style={styles.container}>
+      {/* Headers are green (light) or near-black (dark), so light icons suit both */}
+      <StatusBar style="light" />
       {!authenticated && !isAuthenticated ? (
         <View style={styles.authContainer}>
           <Text style={styles.authTitle}>Budget Tracker</Text>
           <Text style={styles.authMessage}>
             {authError || "Please authenticate to access your budget data"}
           </Text>
-          <TouchableOpacity
-            style={styles.authButton}
-            onPress={handleAuthentication}>
-            <Text style={styles.authButtonText}>Authenticate</Text>
-          </TouchableOpacity>
+          <Button
+            title="Authenticate"
+            onPress={handleAuthentication}
+          />
         </View>
       ) : (
-        <BudgetProvider>
-          <TransactionsProvider>
-            <Stack
-              screenOptions={{
-                headerStyle: {
-                  backgroundColor: "#043927",
-                },
-                headerTintColor: "#fff",
-                headerTitleStyle: {
-                  fontWeight: "bold",
-                },
-              }}>
-              <Stack.Screen
-                name="index"
-                options={{
-                  title: "Budget Tracker",
+        <ThemeProvider value={navigationTheme}>
+          <BudgetProvider>
+            <TransactionsProvider>
+              <Stack
+                screenOptions={{
+                  headerStyle: { backgroundColor: theme.colors.headerBackground },
+                  headerTintColor: theme.colors.headerText,
+                  headerTitleStyle: { fontWeight: "700" },
+                  headerShadowVisible: false,
+                  contentStyle: { backgroundColor: theme.colors.background },
                   animation: "slide_from_right",
-                }}
-              />
-              <Stack.Screen
-                name="addIncomeScreen"
-                options={{
-                  title: "Add Income",
-                  animation: "slide_from_right",
-                }}
-              />
-              <Stack.Screen
-                name="addExpenseScreen"
-                options={{
-                  title: "Add Expense",
-                  animation: "slide_from_right",
-                }}
-              />
-              <Stack.Screen
-                name="addPurchaseScreen"
-                options={{
-                  title: "Add Planned Purchase",
-                  animation: "slide_from_right",
-                }}
-              />
-              <Stack.Screen
-                name="plannedPurchasesScreen"
-                options={{
-                  title: "Planned Purchases",
-                  animation: "flip",
-                }}
-              />
-              <Stack.Screen
-                name="settingsScreen"
-                options={{
-                  title: "Settings",
-                  animation: "simple_push",
-                }}
-              />
-              <Stack.Screen
-                name="statsScreen"
-                options={{
-                  title: "Statistics",
-                  animation: "slide_from_right",
-                }}
-              />
-            </Stack>
-          </TransactionsProvider>
-        </BudgetProvider>
+                }}>
+                <Stack.Screen
+                  name="(tabs)"
+                  options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                  name="addPurchaseScreen"
+                  options={{ title: "New Planned Purchase" }}
+                />
+                <Stack.Screen
+                  name="settingsScreen"
+                  options={{ title: "Settings" }}
+                />
+              </Stack>
+            </TransactionsProvider>
+          </BudgetProvider>
+        </ThemeProvider>
       )}
       <PasscodeModal
         visible={showPasscodeModal}
@@ -257,44 +223,28 @@ export const unstable_settings = {
   web: false,
 };
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, spacing, font }) => ({
   container: {
     flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f4f4f4",
+    backgroundColor: colors.background,
   },
   authContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#f4f4f4",
-    padding: 20,
+    backgroundColor: colors.background,
+    padding: spacing.xl,
   },
   authTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#043927",
-    marginBottom: 20,
+    fontSize: font.title,
+    fontWeight: "700",
+    color: colors.text,
+    marginBottom: spacing.md,
   },
   authMessage: {
-    fontSize: 16,
-    color: "#666",
+    fontSize: font.body,
+    color: colors.textMuted,
     textAlign: "center",
-    marginBottom: 30,
+    marginBottom: spacing.xl,
   },
-  authButton: {
-    backgroundColor: "#043927",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  authButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-})
+}))

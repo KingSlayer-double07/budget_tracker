@@ -1,10 +1,10 @@
 import React, { useContext } from "react"
 import { View, ScrollView, Text } from "react-native"
-import TrendGraph from "./components/TrendGraph"
-import { Transaction } from "./components/TrendGraph"
-import CategoryBreakdown from "./components/CategoryBreakdown"
-import { TransactionsContext } from "./context/TransactionsContext"
-import { useBudget } from "./context/BudgetContext"
+import TrendGraph from "../components/TrendGraph"
+import { Transaction } from "../components/TrendGraph"
+import CategoryBreakdown from "../components/CategoryBreakdown"
+import { TransactionsContext } from "../context/TransactionsContext"
+import { useBudget } from "../context/BudgetContext"
 
 export default function StatsScreen() {
   const context = useContext(TransactionsContext) || { transactions: [] }

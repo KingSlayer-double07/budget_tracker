@@ -10,53 +10,42 @@ import {
   Alert,
   ActivityIndicator,
   Pressable,
+  ScrollView,
 } from "react-native"
 import { useRouter } from "expo-router"
-import { useBudget } from "./context/BudgetContext"
-import { stopRecurring, getNextDueDate, UNCATEGORIZED } from "./database"
-import { NotificationService } from "./services/NotificationService"
-import { clearExpensesTable } from "./database"
-import ConfirmationModal from "./components/ConfirmationModal"
-import {
-  CategoryChips,
-  CategoryPickerModal,
-} from "./components/CategoryPicker"
+import { useBudget } from "../context/BudgetContext"
+import { stopRecurring, getNextDueDate } from "../database"
+import { NotificationService } from "../services/NotificationService"
+import { clearIncomeTable } from "../database"
+import ConfirmationModal from "../components/ConfirmationModal"
 import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable"
+import { Ionicons } from "@expo/vector-icons"
 
-export default function AddExpenseScreen() {
-  const [description, setDescription] = useState("")
+export default function AddIncomeScreen() {
+  const [source, setSource] = useState("")
   const [amount, setAmount] = useState("")
   const [isRecurring, setIsRecurring] = useState(false)
   const [recurringDate, setRecurringDate] = useState("")
-  const [categoryId, setCategoryId] = useState<number | null>(null)
-  // Expense whose category is being changed from the history list
-  const [recategorizing, setRecategorizing] = useState<{
-    id: number
-    item: string
-    category_id: number | null
-  } | null>(null)
   const [showCancelModal, setShowCancelModal] = useState(false)
-  const [selectedExpense, setSelectedExpense] = useState<{
+  const [selectedIncome, setSelectedIncome] = useState<{
     id: number
-    item: string
+    source: string
     amount: number
     is_recurring: boolean
     recurring_date: string | null
   } | null>(null)
   const router = useRouter()
   const {
-    expenseList,
+    incomeList,
     isLoading,
     error,
-    addNewExpense,
+    addNewIncome,
     refreshData,
-    deleteSelectedExpense,
-    categories,
-    changeExpenseCategory,
+    deleteSelectedIncome,
   } = useBudget()
 
-  const handleSaveExpense = async () => {
-    if (!description.trim() || !amount.trim()) {
+  const handleSaveIncome = async () => {
+    if (!source.trim() || !amount.trim()) {
       Alert.alert("Error", "Please fill in all fields")
       return
     }
@@ -68,15 +57,14 @@ export default function AddExpenseScreen() {
     }
 
     try {
-      const success = await addNewExpense(
-        description,
+      const success = await addNewIncome(
+        source,
         numAmount,
         isRecurring,
-        recurringDate,
-        categoryId
+        recurringDate
       )
       if (success) {
-        // Schedule notification for recurring expense if date is provided
+        // Schedule notification for recurring income if date is provided
         if (isRecurring && recurringDate) {
           const notificationService = NotificationService.getInstance()
           const day = parseInt(recurringDate)
@@ -85,49 +73,48 @@ export default function AddExpenseScreen() {
           const nextDate = getNextDueDate(day)
 
           await notificationService.scheduleRecurringTransaction(
-            "Recurring Expense Due",
-            `Your recurring expense of NGN${numAmount.toLocaleString()} for ${description} is due next on ${nextDate.toLocaleDateString()}`,
+            "Recurring Income Due",
+            `Your recurring income of NGN${numAmount.toLocaleString()} from ${source} is due next on ${nextDate.toLocaleDateString()}`,
             nextDate,
-            `recurring-expense-${description}-${recurringDate}`,
-            description,
+            `recurring-income-${source}-${recurringDate}`,
+            source,
             {
-              table: "expenses",
-              name: description.trim(),
+              table: "income",
+              name: source.trim(),
               recurringDay: recurringDate,
             }
           )
         }
 
-        Alert.alert("Success", "Expense added successfully!")
-        setDescription("")
+        Alert.alert("Success", "Income added successfully!")
+        setSource("")
         setAmount("")
         setRecurringDate("")
-        setCategoryId(null)
       } else {
-        Alert.alert("Error", "Failed to add expense. Please try again.")
+        Alert.alert("Error", "Failed to add income. Please try again.")
       }
     } catch (error) {
       Alert.alert("Error", "An unexpected error occurred. Please try again.")
     }
   }
 
-  const handleLongPress = (expense: {
+  const handleLongPress = (income: {
     id: number
-    item: string
+    source: string
     amount: number
     is_recurring: boolean
     recurring_date: string | null
   }) => {
-    if (expense.is_recurring) {
-      setSelectedExpense(expense)
+    if (income.is_recurring) {
+      setSelectedIncome(income)
       setShowCancelModal(true)
     }
   }
 
   const handleDelete = async (id: number) => {
     Alert.alert(
-      "Delete Expense",
-      "Are you sure you want to delete this expense?",
+      "Delete Income",
+      "Are you sure you want to delete this income?",
       [
         {
           text: "Cancel",
@@ -137,14 +124,11 @@ export default function AddExpenseScreen() {
           text: "Delete",
           style: "destructive",
           onPress: async () => {
-            const success = await deleteSelectedExpense(id)
+            const success = await deleteSelectedIncome(id)
             if (success) {
-              Alert.alert("Success", "Expense deleted successfully!")
+              Alert.alert("Success", "Income deleted successfully!")
             } else {
-              Alert.alert(
-                "Error",
-                "Failed to delete expense. Please try again."
-              )
+              Alert.alert("Error", "Failed to delete income. Please try again.")
             }
           },
         },
@@ -154,8 +138,8 @@ export default function AddExpenseScreen() {
 
   const handleClearAll = () => {
     Alert.alert(
-      "Clear All Expenses",
-      "Are you sure you want to delete all expenses? This action is irreversible.",
+      "Clear All Income",
+      "Are you sure you want to delete all income? This action is irreversible.",
       [
         {
           text: "Cancel",
@@ -166,10 +150,10 @@ export default function AddExpenseScreen() {
           style: "destructive",
           onPress: async () => {
             // Failures are already reported by the database layer
-            const success = await clearExpensesTable()
+            const success = await clearIncomeTable()
             if (success) {
               await refreshData()
-              Alert.alert("Success", "All expenses have been cleared")
+              Alert.alert("Success", "All income has been cleared")
             }
           },
         },
@@ -188,49 +172,36 @@ export default function AddExpenseScreen() {
   }
 
   const handleCancelFutureOccurrences = async () => {
-    if (!selectedExpense) return
+    if (!selectedIncome) return
 
     try {
       // Clear the recurring flag so no further occurrences are recorded
-      const stopped = await stopRecurring("expenses", selectedExpense.id)
-      if (!stopped) throw new Error("Failed to stop recurring expenses")
+      const stopped = await stopRecurring("income", selectedIncome.id)
+      if (!stopped) throw new Error("Failed to stop recurring income")
       await refreshData()
 
       const notificationService = NotificationService.getInstance()
       await notificationService.cancelFutureOccurrences(
-        selectedExpense.item,
-        `recurring-expense-${selectedExpense.item}-${selectedExpense.recurring_date}`
+        selectedIncome.source,
+        `recurring-income-${selectedIncome.source}-${selectedIncome.recurring_date}`
       )
       Alert.alert("Success", "Future occurrences cancelled successfully")
       setShowCancelModal(false)
-      setSelectedExpense(null)
+      setSelectedIncome(null)
     } catch (error) {
       Alert.alert("Error", "Failed to cancel future occurrences")
     }
   }
 
-  const handleChangeCategory = async (newCategoryId: number | null) => {
-    if (!recategorizing) return
-    const expense = recategorizing
-    setRecategorizing(null)
-    if (newCategoryId === expense.category_id) return
-    const success = await changeExpenseCategory(expense.id, newCategoryId)
-    if (!success) {
-      Alert.alert("Error", "Failed to change the category")
-    }
-  }
-
-  const renderExpenseItem = ({
+  const renderIncomeItem = ({
     item,
   }: {
     item: {
       id: number
-      item: string
+      source: string
       amount: number
       is_recurring: boolean
       recurring_date: string | null
-      category_id: number | null
-      category_name: string | null
     }
   }) => (
     <Swipeable
@@ -238,25 +209,15 @@ export default function AddExpenseScreen() {
       rightThreshold={40}
       overshootRight={true}>
       <Pressable
-        style={styles.expenseItem}
-        onPress={() => setRecategorizing(item)}
+        style={styles.incomeItem}
         onLongPress={() => handleLongPress(item)}
         delayLongPress={500}>
-        <View style={styles.expenseContent}>
-          <View style={styles.expenseHeader}>
-            <Text style={styles.expenseDescription}>{item.item}</Text>
-            <Text
-              style={[
-                styles.categoryTag,
-                !item.category_name && styles.categoryTagEmpty,
-              ]}>
-              {item.category_name ?? UNCATEGORIZED}
-            </Text>
-          </View>
-          <Text style={styles.expenseAmount}>
+        <View style={styles.incomeContent}>
+          <Text style={styles.incomeSource}>{item.source}</Text>
+          <Text style={styles.incomeAmount}>
             NGN{item.amount.toLocaleString()}
           </Text>
-          {item.recurring_date && (
+          {item.is_recurring && item.recurring_date && (
             <Text style={styles.recurringText}>
               Recurring on day {item.recurring_date}
             </Text>
@@ -295,9 +256,9 @@ export default function AddExpenseScreen() {
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
-          placeholder="Expense Description"
-          value={description}
-          onChangeText={setDescription}
+          placeholder="Income Source"
+          value={source}
+          onChangeText={setSource}
         />
         <TextInput
           style={styles.input}
@@ -307,20 +268,12 @@ export default function AddExpenseScreen() {
           keyboardType="numeric"
         />
         <View style={styles.switchContainer}>
-          <Text style={styles.switchLabel}>Recurring Expense</Text>
+          <Text style={styles.switchLabel}>Recurring Income</Text>
           <Switch
             value={isRecurring}
             onValueChange={setIsRecurring}
             trackColor={{ false: "#767577", true: "#81b0ff" }}
             thumbColor={isRecurring ? "#043927" : "#f4f3f4"}
-          />
-        </View>
-        <Text style={styles.fieldLabel}>Category</Text>
-        <View style={styles.categoryPicker}>
-          <CategoryChips
-            categories={categories}
-            selectedId={categoryId}
-            onSelect={setCategoryId}
           />
         </View>
         {isRecurring && (
@@ -335,53 +288,44 @@ export default function AddExpenseScreen() {
         )}
         <TouchableOpacity
           style={styles.button}
-          onPress={handleSaveExpense}>
-          <Text style={styles.buttonText}>Add Expense</Text>
+          onPress={handleSaveIncome}>
+          <Text style={styles.buttonText}>Add Income</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.historyContainer}>
         <View style={styles.historyHeader}>
-          <Text style={styles.historyTitle}>Expense History</Text>
+          <Text style={styles.historyTitle}>Income History</Text>
           <TouchableOpacity
             style={styles.clearButton}
             onPress={handleClearAll}
-            disabled={expenseList.length === 0}>
+            disabled={incomeList.length === 0}>
             <Text
               style={[
                 styles.clearButtonText,
-                expenseList.length === 0 && styles.clearButtonDisabled,
+                incomeList.length === 0 && styles.clearButtonDisabled,
               ]}>
               Clear All
             </Text>
           </TouchableOpacity>
         </View>
         <FlatList
-          data={expenseList}
-          renderItem={renderExpenseItem}
+          data={incomeList}
+          renderItem={renderIncomeItem}
           keyExtractor={(item) => item.id.toString()}
           style={styles.list}
           showsVerticalScrollIndicator={false}
         />
       </View>
 
-      <CategoryPickerModal
-        visible={recategorizing !== null}
-        title={`Category for "${recategorizing?.item ?? ""}"`}
-        categories={categories}
-        selectedId={recategorizing?.category_id ?? null}
-        onSelect={handleChangeCategory}
-        onCancel={() => setRecategorizing(null)}
-      />
-
       <ConfirmationModal
         visible={showCancelModal}
         title="Cancel Future Occurrences"
-        message={`Are you sure you want to cancel future occurrences of the recurring expense "${selectedExpense?.item}"?`}
+        message={`Are you sure you want to cancel future occurrences of the recurring income "${selectedIncome?.source}"?`}
         onConfirm={handleCancelFutureOccurrences}
         onCancel={() => {
           setShowCancelModal(false)
-          setSelectedExpense(null)
+          setSelectedIncome(null)
         }}
       />
     </View>
@@ -469,7 +413,7 @@ const styles = StyleSheet.create({
   list: {
     flex: 1,
   },
-  expenseItem: {
+  incomeItem: {
     backgroundColor: "#f8f9fa",
     padding: 15,
     borderRadius: 8,
@@ -477,46 +421,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e9ecef",
   },
-  expenseContent: {
+  incomeContent: {
     flexDirection: "column",
   },
-  expenseHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 8,
-  },
-  expenseDescription: {
-    flex: 1,
+  incomeSource: {
     fontSize: 16,
     fontWeight: "bold",
     color: "#043927",
     marginBottom: 5,
   },
-  categoryTag: {
-    fontSize: 12,
-    color: "#043927",
-    backgroundColor: "#e3efe9",
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 10,
-    overflow: "hidden",
-  },
-  categoryTagEmpty: {
-    color: "#6c757d",
-    backgroundColor: "#eceff1",
-  },
-  fieldLabel: {
-    fontSize: 14,
-    color: "#555",
-    marginBottom: 6,
-  },
-  categoryPicker: {
-    marginBottom: 12,
-  },
-  expenseAmount: {
+  incomeAmount: {
     fontSize: 16,
-    color: "#dc3545",
+    color: "#28a745",
     marginBottom: 5,
   },
   recurringText: {

@@ -10,9 +10,9 @@ import {
   Alert,
 } from "react-native"
 import { useRouter } from "expo-router"
-import { useBudget } from "./context/BudgetContext"
-import { NotificationService } from "./services/NotificationService"
-import { useAuth } from "./context/AuthContext"
+import { useBudget } from "../context/BudgetContext"
+import { NotificationService } from "../services/NotificationService"
+import { useAuth } from "../context/AuthContext"
 
 export default function Index() {
   const router = useRouter()

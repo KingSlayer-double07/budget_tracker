@@ -9,10 +9,10 @@ import {
   ActivityIndicator,
   Animated,
 } from "react-native"
-import { useBudget } from "./context/BudgetContext"
+import { useBudget } from "../context/BudgetContext"
 import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable"
-import { clearPlannedPurchasesTable } from "./database"
-import InputModal from "./components/InputModal"
+import { clearPlannedPurchasesTable } from "../database"
+import InputModal from "../components/InputModal"
 
 export default function PlannedPurchasesScreen() {
   const [selectedPurchase, setSelectedPurchase] = useState<{

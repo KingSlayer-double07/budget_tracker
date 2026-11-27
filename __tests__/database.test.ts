@@ -539,28 +539,82 @@ describe("editing entries", () => {
     expect(alertSpy).toHaveBeenCalledTimes(3)
   })
 
-  it("uses an edited repeating expense for later occurrences only", async () => {
-    setToday(new Date(2026, 8, 5, 9)) // set up on 5 Sep, due on the 5th
+  // Gym set up on 5 Sep (₦15,000), then processed for 5 Oct
+  const setUpGym = async () => {
+    setToday(new Date(2026, 8, 5, 9))
     await database.addExpense("Gym", 15000, true, "5")
-
-    setToday(new Date(2026, 9, 5, 9)) // 5 Oct occurrence at the old price
+    setToday(new Date(2026, 9, 5, 9))
     await database.handleRecurringUpdates()
+    return (await allRows("expenses"))[0]
+  }
 
-    const [template] = await allRows("expenses")
-    await database.updateExpense(template.id, "Gym membership", 18000, null)
+  const expenseRows = async () =>
+    (await allRows("expenses")).map((row) => [row.item, row.amount, row.date])
 
-    setToday(new Date(2026, 10, 5, 9)) // 5 Nov occurrence at the new price
+  it("changes only later months when a repeating expense is edited for future months", async () => {
+    const gym = await setUpGym()
+    const transport = (await database.getCategories()).find(
+      (c) => c.name === "Transport"
+    )!.id
+    await database.updateExpense(gym.id, "Gym membership", 18000, transport, "future")
+
+    // September, the month the entry was added in, keeps its amount
+    expect(await database.getMonthlyExpenses(new Date(2026, 8, 1))).toBe(15000)
+
+    setToday(new Date(2026, 10, 5, 9))
     await database.handleRecurringUpdates()
-
-    const rows = (await allRows("expenses")).map((row) => [
-      row.item,
-      row.amount,
-      row.date,
-    ])
-    expect(rows).toEqual([
-      ["Gym membership", 18000, "2026-09-05"],
+    expect(await expenseRows()).toEqual([
+      ["Gym", 15000, "2026-09-05"],
       ["Gym", 15000, "2026-10-05"],
       ["Gym membership", 18000, "2026-11-05"],
     ])
+    const november = (await allRows("expenses"))[2]
+    expect(november.category_id).toBe(transport)
+  })
+
+  it("changes the entry and later months when edited as a whole", async () => {
+    const gym = await setUpGym()
+    await database.updateExpense(gym.id, "Gym", 15000, null, "future")
+    // Matching the entry again clears the future-only values
+    expect((await allRows("expenses"))[0].next_amount).toBeNull()
+
+    await database.updateExpense(gym.id, "Gym", 16000, null, "future")
+    await database.updateExpense(gym.id, "Gym (typo fixed)", 15500, null)
+
+    setToday(new Date(2026, 10, 5, 9))
+    await database.handleRecurringUpdates()
+    expect(await expenseRows()).toEqual([
+      ["Gym (typo fixed)", 15500, "2026-09-05"],
+      ["Gym", 15000, "2026-10-05"],
+      ["Gym (typo fixed)", 15500, "2026-11-05"],
+    ])
+  })
+
+  it("stops a repeating income by its future-months name", async () => {
+    setToday(new Date(2026, 8, 25, 9))
+    await database.addIncome("Salary", 300000, true, "25")
+    const [salary] = await allRows("income")
+    await database.updateIncome(salary.id, "Salary (new job)", 350000, "future")
+
+    // The reminder shows the future name, so that's what its action sends
+    expect(await database.stopRecurringByName("income", "Salary", "25")).toBe(true)
+    expect((await allRows("income"))[0].is_recurring).toBe(1)
+    await database.stopRecurringByName("income", "Salary (new job)", "25")
+    expect((await allRows("income"))[0]).toMatchObject({
+      source: "Salary",
+      amount: 300000,
+      is_recurring: 0,
+      next_amount: null,
+    })
+  })
+
+  it("clears a removed category from future-month values", async () => {
+    const gym = await setUpGym()
+    const health = (await database.getCategories()).find(
+      (c) => c.name === "Health"
+    )!.id
+    await database.updateExpense(gym.id, "Gym", 18000, health, "future")
+    await database.deleteCategory(health)
+    expect((await allRows("expenses"))[0].next_category_id).toBeNull()
   })
 })

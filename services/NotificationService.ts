@@ -175,8 +175,9 @@ export class NotificationService {
     )
   }
 
-  // Schedule the monthly "due today" reminder for a recurring entry
-  private async scheduleMonthlyReminder(
+  // Schedule the monthly "due today" reminder for a recurring entry (also
+  // used to bring reminders back after restoring a backup)
+  public async scheduleMonthlyReminder(
     title: string,
     recurringDate: Date,
     identifier: string,
@@ -264,10 +265,12 @@ export class NotificationService {
     body: string,
     dueDate: Date,
     identifier: string,
-    item: string
+    item: string,
+    // Off when bringing reminders back after restoring a backup
+    notifyAdded: boolean = true
   ): Promise<void> {
     // Send immediate notification
-    await Notifications.scheduleNotificationAsync({
+    if (notifyAdded) await Notifications.scheduleNotificationAsync({
       content: {
         title: "Purchase Added",
         body: `Your planned purchase "${item}" has been added to your list. Due date: ${dueDate.toLocaleDateString()}`,

@@ -30,7 +30,11 @@ import {
   setExpenseCategory,
   Category,
   CategoryTotal,
+  getMonthlyIncome,
+  getMonthlyExpenses,
+  BUDGET_THRESHOLD_KEY,
 } from "../database"
+import { SecureStorageService } from "../services/SecureStorageService"
 
 interface BudgetContextType {
   totalIncome: number
@@ -42,6 +46,10 @@ interface BudgetContextType {
   categories: Category[]
   // This month's spending per category, largest first
   categoryTotals: CategoryTotal[]
+  // Current month's totals and the monthly budget (null when not set)
+  monthlyIncome: number
+  monthlyExpenses: number
+  monthlyBudget: number | null
   isLoading: boolean
   error: string | null
   refreshData: () => Promise<void>
@@ -90,12 +98,16 @@ export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({
   const [plannedPurchases, setPlannedPurchases] = useState<any[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [categoryTotals, setCategoryTotals] = useState<CategoryTotal[]>([])
+  const [monthlyIncome, setMonthlyIncome] = useState(0)
+  const [monthlyExpenses, setMonthlyExpenses] = useState(0)
+  const [monthlyBudget, setMonthlyBudget] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
     try {
-      setIsLoading(true)
+      // isLoading starts true and only covers the first load; later refreshes
+      // keep the current screen visible instead of replacing it with a spinner
       setError(null)
 
       // Fetch all data in parallel
@@ -108,6 +120,9 @@ export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({
         currentBalance,
         categoryList,
         monthlyCategoryTotals,
+        incomeThisMonth,
+        expensesThisMonth,
+        budgetSetting,
       ] = await Promise.all([
         getIncome(),
         getExpenses(),
@@ -117,6 +132,9 @@ export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({
         getBalance(),
         getCategories(),
         getMonthlyExpensesByCategory(),
+        getMonthlyIncome(),
+        getMonthlyExpenses(),
+        SecureStorageService.getInstance().getSecureItem(BUDGET_THRESHOLD_KEY),
       ])
 
       setIncomeList(income)
@@ -127,6 +145,10 @@ export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({
       setBalance(currentBalance)
       setCategories(categoryList)
       setCategoryTotals(monthlyCategoryTotals)
+      setMonthlyIncome(incomeThisMonth)
+      setMonthlyExpenses(expensesThisMonth)
+      const budget = parseFloat(budgetSetting ?? "")
+      setMonthlyBudget(!isNaN(budget) && budget > 0 ? budget : null)
 
       // Runs after every data change, so it covers manual, bought and recurring expenses
       await checkBudgetThreshold()
@@ -283,6 +305,9 @@ export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({
         plannedPurchases,
         categories,
         categoryTotals,
+        monthlyIncome,
+        monthlyExpenses,
+        monthlyBudget,
         isLoading,
         error,
         refreshData: fetchData,

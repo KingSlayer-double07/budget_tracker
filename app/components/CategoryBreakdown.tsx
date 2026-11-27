@@ -1,58 +1,63 @@
 import React from "react"
-import { StyleSheet, Text, View } from "react-native"
+import { Text, View } from "react-native"
 import { CategoryTotal } from "../database"
+import { Card } from "./ui"
+import { formatNaira, makeStyles } from "../../theme"
 
 interface CategoryBreakdownProps {
   totals: CategoryTotal[]
   month?: Date
+  // Show only the largest few categories (e.g. on the dashboard)
+  limit?: number
+  title?: string
 }
 
 // This month's spending per category, with each category's share of the total
 export default function CategoryBreakdown({
   totals,
   month = new Date(),
+  limit,
+  title = "Spending by category",
 }: CategoryBreakdownProps) {
+  const styles = useStyles()
   const monthTotal = totals.reduce((sum, row) => sum + row.total, 0)
-  const monthLabel = month.toLocaleDateString(undefined, {
+  const monthLabel = month.toLocaleDateString("en-GB", {
     month: "long",
     year: "numeric",
   })
+  const rows = limit ? totals.slice(0, limit) : totals
 
   return (
-    <View style={styles.card}>
-      <Text style={styles.title}>Spending by category</Text>
+    <Card style={styles.card}>
+      <Text style={styles.title}>{title}</Text>
       <Text style={styles.subtitle}>
-        {monthLabel} · NGN{monthTotal.toLocaleString()}
+        {monthLabel} · {formatNaira(monthTotal)}
       </Text>
 
-      {totals.length === 0 ? (
+      {rows.length === 0 ? (
         <Text style={styles.empty}>No expenses recorded this month.</Text>
       ) : (
-        totals.map((row) => {
+        rows.map((row) => {
           const share = monthTotal > 0 ? row.total / monthTotal : 0
+          const uncategorized = row.categoryId === null
           return (
             <View
               key={row.categoryId ?? "none"}
               style={styles.row}>
               <View style={styles.rowHeader}>
                 <Text
-                  style={[
-                    styles.name,
-                    row.categoryId === null && styles.nameMuted,
-                  ]}
+                  style={[styles.name, uncategorized && styles.nameMuted]}
                   numberOfLines={1}>
                   {row.name}
                 </Text>
-                <Text style={styles.amount}>
-                  NGN{row.total.toLocaleString()}
-                </Text>
+                <Text style={styles.amount}>{formatNaira(row.total)}</Text>
                 <Text style={styles.percent}>{Math.round(share * 100)}%</Text>
               </View>
               <View style={styles.track}>
                 <View
                   style={[
                     styles.bar,
-                    row.categoryId === null && styles.barMuted,
+                    uncategorized && styles.barMuted,
                     { width: `${share * 100}%` },
                   ]}
                 />
@@ -61,81 +66,84 @@ export default function CategoryBreakdown({
           )
         })
       )}
-    </View>
+      {limit !== undefined && totals.length > limit && (
+        <Text style={styles.more}>
+          +{totals.length - limit} more in Stats
+        </Text>
+      )}
+    </Card>
   )
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, spacing, radius, font }) => ({
   card: {
-    padding: 16,
-    borderRadius: 16,
-    backgroundColor: "#ffffff",
-    marginBottom: 24,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
+    marginBottom: spacing.xl,
   },
   title: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#333",
+    fontSize: font.heading,
+    fontWeight: "700",
+    color: colors.text,
   },
   subtitle: {
-    fontSize: 14,
-    color: "#6c757d",
+    fontSize: font.label,
+    color: colors.textMuted,
     marginTop: 2,
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   empty: {
-    color: "#888",
-    fontSize: 15,
+    color: colors.textSubtle,
+    fontSize: font.body,
     textAlign: "center",
-    paddingVertical: 12,
+    paddingVertical: spacing.md,
   },
   row: {
-    marginBottom: 14,
+    marginBottom: spacing.md + 2,
   },
   rowHeader: {
     flexDirection: "row",
     alignItems: "baseline",
     marginBottom: 6,
-    gap: 8,
+    gap: spacing.sm,
   },
   name: {
     flex: 1,
-    fontSize: 15,
-    color: "#333",
+    fontSize: font.body - 1,
+    color: colors.text,
   },
   nameMuted: {
-    color: "#6c757d",
+    color: colors.textMuted,
     fontStyle: "italic",
   },
   amount: {
-    fontSize: 15,
+    fontSize: font.body - 1,
     fontWeight: "600",
-    color: "#333",
+    color: colors.text,
     fontVariant: ["tabular-nums"],
   },
   percent: {
     width: 40,
     textAlign: "right",
-    fontSize: 13,
-    color: "#6c757d",
+    fontSize: font.caption + 1,
+    color: colors.textMuted,
     fontVariant: ["tabular-nums"],
   },
   track: {
     height: 8,
-    borderRadius: 4,
-    backgroundColor: "#eef1ef",
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceMuted,
     overflow: "hidden",
   },
   bar: {
     height: 8,
-    borderRadius: 4,
-    backgroundColor: "#043927",
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
   },
   barMuted: {
-    backgroundColor: "#9aa5a0",
+    backgroundColor: colors.textSubtle,
   },
-})
+  more: {
+    fontSize: font.caption + 1,
+    color: colors.textMuted,
+    marginTop: -spacing.xs,
+  },
+}))

@@ -1,15 +1,9 @@
 import React, { useState } from "react"
-import {
-  Alert,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native"
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native"
 import { useBudget } from "../context/BudgetContext"
 import { Category } from "../database"
+import { Button, Card } from "./ui"
+import { makeStyles, useTheme } from "../../theme"
 
 // Settings section for adding, renaming and removing expense categories
 export default function CategoryManager() {
@@ -18,6 +12,8 @@ export default function CategoryManager() {
   const [newName, setNewName] = useState("")
   const [editing, setEditing] = useState<Category | null>(null)
   const [editName, setEditName] = useState("")
+  const styles = useStyles()
+  const { colors } = useTheme()
 
   const handleAdd = async () => {
     if (await addNewCategory(newName)) {
@@ -73,9 +69,8 @@ export default function CategoryManager() {
   }
 
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Expense Categories</Text>
-      <Text style={styles.hint}>Long-press a category to rename or remove it.</Text>
+    <Card style={styles.card}>
+      <Text style={styles.hint}>Hold a category to rename or remove it.</Text>
 
       {categories.map((category) =>
         editing?.id === category.id ? (
@@ -83,23 +78,25 @@ export default function CategoryManager() {
             key={category.id}
             style={styles.editRow}>
             <TextInput
-              style={[styles.input, styles.editInput]}
+              style={styles.input}
               value={editName}
               onChangeText={setEditName}
               autoFocus
               maxLength={40}
               onSubmitEditing={handleRename}
+              placeholderTextColor={colors.textSubtle}
             />
-            <TouchableOpacity
+            <Button
+              title="Save"
+              onPress={handleRename}
               style={styles.smallButton}
-              onPress={handleRename}>
-              <Text style={styles.smallButtonText}>Save</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.smallButton, styles.cancelButton]}
-              onPress={() => setEditing(null)}>
-              <Text style={styles.smallButtonText}>Cancel</Text>
-            </TouchableOpacity>
+            />
+            <Button
+              title="Cancel"
+              variant="ghost"
+              onPress={() => setEditing(null)}
+              style={styles.smallButton}
+            />
           </View>
         ) : (
           <Pressable
@@ -114,97 +111,73 @@ export default function CategoryManager() {
 
       <View style={styles.addRow}>
         <TextInput
-          style={[styles.input, styles.editInput]}
+          style={styles.input}
           value={newName}
           onChangeText={setNewName}
           placeholder="New category"
+          placeholderTextColor={colors.textSubtle}
           maxLength={40}
           onSubmitEditing={handleAdd}
         />
-        <TouchableOpacity
-          style={[styles.smallButton, !newName.trim() && styles.disabled]}
+        <Button
+          title="Add"
           onPress={handleAdd}
-          disabled={!newName.trim()}>
-          <Text style={styles.smallButtonText}>Add</Text>
-        </TouchableOpacity>
+          disabled={!newName.trim()}
+          style={styles.smallButton}
+        />
       </View>
-    </View>
+    </Card>
   )
 }
 
-const styles = StyleSheet.create({
-  section: {
-    backgroundColor: "white",
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 20,
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 5,
+const useStyles = makeStyles(({ colors, spacing, radius, font }) => ({
+  card: {
+    marginBottom: spacing.xl,
+    paddingVertical: spacing.md,
   },
   hint: {
-    fontSize: 13,
-    color: "#6c757d",
-    marginBottom: 10,
+    fontSize: font.caption + 1,
+    color: colors.textMuted,
+    marginBottom: spacing.sm,
   },
   row: {
-    paddingVertical: 12,
-    paddingHorizontal: 4,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xs,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#ddd",
+    borderBottomColor: colors.border,
   },
   rowPressed: {
-    backgroundColor: "#f0f4f2",
+    backgroundColor: colors.surfaceMuted,
   },
   rowText: {
-    fontSize: 16,
-    color: "#333",
+    fontSize: font.body,
+    color: colors.text,
   },
   editRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: spacing.sm,
     paddingVertical: 6,
   },
   addRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginTop: 12,
+    gap: spacing.sm,
+    marginTop: spacing.md,
   },
   input: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    padding: 10,
-    borderRadius: 5,
-    fontSize: 16,
-  },
-  editInput: {
     flex: 1,
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    fontSize: font.body,
+    color: colors.text,
   },
   smallButton: {
-    backgroundColor: "#043927",
     paddingVertical: 10,
     paddingHorizontal: 14,
-    borderRadius: 5,
   },
-  cancelButton: {
-    backgroundColor: "#ccc",
-  },
-  disabled: {
-    opacity: 0.5,
-  },
-  smallButtonText: {
-    color: "white",
-    fontSize: 15,
-    fontWeight: "600",
-  },
-})
+}))

@@ -4,12 +4,14 @@ import { useRouter } from "expo-router"
 import { useBudget } from "../context/BudgetContext"
 import { NotificationService } from "../services/NotificationService"
 import { Button, Card, ErrorState, Field, LoadingState } from "../components/ui"
+import DateField from "../components/DateField"
 import { formatNaira, makeStyles } from "../theme"
 
 export default function AddPurchaseScreen() {
   const [item, setItem] = useState("")
   const [amount, setAmount] = useState("")
-  const [dueDate, setDueDate] = useState("")
+  // YYYY-MM-DD, or null for no due date
+  const [dueDate, setDueDate] = useState<string | null>(null)
   const router = useRouter()
   const { isLoading, error, addNewPlannedPurchase, refreshData } = useBudget()
   const styles = useStyles()
@@ -30,7 +32,7 @@ export default function AddPurchaseScreen() {
       const success = await addNewPlannedPurchase(
         item.trim(),
         numericAmount,
-        dueDate.trim() || undefined
+        dueDate ?? undefined
       )
 
       if (success) {
@@ -95,13 +97,14 @@ export default function AddPurchaseScreen() {
           placeholder="0"
           keyboardType="numeric"
         />
-        <Field
+        <DateField
           label="Due date (optional)"
           value={dueDate}
-          onChangeText={setDueDate}
-          placeholder="YYYY-MM-DD"
+          onChange={setDueDate}
+          minimumDate={new Date()}
+          optional
+          placeholder="No due date"
           hint="You'll get a reminder the day before"
-          maxLength={10}
         />
         <Button
           title="Add Planned Purchase"

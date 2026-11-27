@@ -6,10 +6,12 @@ import {
   getNextDueDate,
   clearIncomeTable,
   EditScope,
+  toLocalDateString,
 } from "../../services/database"
 import { NotificationService } from "../../services/NotificationService"
 import ConfirmationModal from "../../components/ConfirmationModal"
 import TransactionRow from "../../components/TransactionRow"
+import DateField from "../../components/DateField"
 import EditEntryModal, { EntryValues } from "../../components/EditEntryModal"
 import {
   Button,
@@ -20,7 +22,7 @@ import {
   LoadingState,
   SectionTitle,
 } from "../../components/ui"
-import { formatNaira, makeStyles, useTheme } from "../../theme"
+import { formatDate, formatNaira, makeStyles, useTheme } from "../../theme"
 
 interface IncomeEntry {
   id: number
@@ -53,6 +55,8 @@ export default function AddIncomeScreen() {
   const [amount, setAmount] = useState("")
   const [isRecurring, setIsRecurring] = useState(false)
   const [recurringDate, setRecurringDate] = useState("")
+  // YYYY-MM-DD when back-dated; null means today, worked out when saving
+  const [date, setDate] = useState<string | null>(null)
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [selectedIncome, setSelectedIncome] = useState<IncomeEntry | null>(
     null
@@ -88,7 +92,8 @@ export default function AddIncomeScreen() {
         source,
         numAmount,
         isRecurring,
-        recurringDate
+        recurringDate,
+        date ?? undefined
       )
       if (success) {
         // Schedule notification for recurring income if date is provided
@@ -118,6 +123,7 @@ export default function AddIncomeScreen() {
         setAmount("")
         setIsRecurring(false)
         setRecurringDate("")
+        setDate(null)
       } else {
         Alert.alert("Error", "Failed to add income. Please try again.")
       }
@@ -201,7 +207,8 @@ export default function AddIncomeScreen() {
       income.id,
       values.name,
       values.amount,
-      scope
+      scope,
+      values.date
     )
     if (!success) {
       Alert.alert("Error", "Failed to save the changes. Please try again.")
@@ -261,6 +268,14 @@ export default function AddIncomeScreen() {
           onChangeText={setAmount}
           keyboardType="numeric"
         />
+        <DateField
+          label="Date"
+          value={date ?? toLocalDateString(new Date())}
+          onChange={(value) =>
+            setDate(value === toLocalDateString(new Date()) ? null : value)
+          }
+          maximumDate={new Date()}
+        />
         <View style={styles.switchRow}>
           <Text style={styles.switchLabel}>Repeats monthly</Text>
           <Switch
@@ -278,7 +293,11 @@ export default function AddIncomeScreen() {
             onChangeText={setRecurringDate}
             keyboardType="numeric"
             maxLength={2}
-            hint="Days 29-31 fall on the last day of shorter months"
+            hint={
+              date && date < toLocalDateString(new Date())
+                ? `Every month since ${formatDate(date)} is recorded too`
+                : "Days 29-31 fall on the last day of shorter months"
+            }
           />
         )}
         <Button
@@ -345,6 +364,7 @@ export default function AddIncomeScreen() {
           name: editing?.source ?? "",
           amount: editing?.amount ?? 0,
           categoryId: null,
+          date: editing?.date,
         }}
         future={
           editing?.is_recurring ? futureValues(editing) : undefined

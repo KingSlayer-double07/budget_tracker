@@ -56,18 +56,21 @@ interface BudgetContextType {
   isLoading: boolean
   error: string | null
   refreshData: () => Promise<void>
+  // `date` (YYYY-MM-DD) defaults to today
   addNewIncome: (
     source: string,
     amount: number,
     isRecurring: boolean,
-    recurringDate: string
+    recurringDate: string,
+    date?: string
   ) => Promise<boolean>
   addNewExpense: (
     item: string,
     amount: number,
     isRecurring: boolean,
     recurringDate: string,
-    categoryId?: number | null
+    categoryId?: number | null,
+    date?: string
   ) => Promise<boolean>
   addNewPlannedPurchase: (
     item: string,
@@ -92,14 +95,16 @@ interface BudgetContextType {
     id: number,
     source: string,
     amount: number,
-    scope?: EditScope
+    scope?: EditScope,
+    date?: string
   ) => Promise<boolean>
   editExpense: (
     id: number,
     item: string,
     amount: number,
     categoryId: number | null,
-    scope?: EditScope
+    scope?: EditScope,
+    date?: string
   ) => Promise<boolean>
 }
 
@@ -196,38 +201,40 @@ export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({
     return () => clearInterval(interval)
   }, [fetchData])
 
-  const addNewIncome = async (
-    source: string,
-    amount: number,
-    isRecurring: boolean,
-    recurringDate: string
-  ): Promise<boolean> => {
-    const success = await addIncome(source, amount, isRecurring, recurringDate)
+  // A repeating entry dated in the past has the months since then filled in
+  // straight away rather than at the next hourly check
+  const refreshAfterAdding = async (success: boolean, isRecurring: boolean) => {
     if (success) {
+      if (isRecurring) await handleRecurringUpdates()
       await fetchData()
     }
     return success
   }
+
+  const addNewIncome = async (
+    source: string,
+    amount: number,
+    isRecurring: boolean,
+    recurringDate: string,
+    date?: string
+  ): Promise<boolean> =>
+    refreshAfterAdding(
+      await addIncome(source, amount, isRecurring, recurringDate, date),
+      isRecurring
+    )
 
   const addNewExpense = async (
     item: string,
     amount: number,
     isRecurring: boolean,
     recurringDate: string,
-    categoryId: number | null = null
-  ): Promise<boolean> => {
-    const success = await addExpense(
-      item,
-      amount,
-      isRecurring,
-      recurringDate,
-      categoryId
+    categoryId: number | null = null,
+    date?: string
+  ): Promise<boolean> =>
+    refreshAfterAdding(
+      await addExpense(item, amount, isRecurring, recurringDate, categoryId, date),
+      isRecurring
     )
-    if (success) {
-      await fetchData()
-    }
-    return success
-  }
 
   const addNewPlannedPurchase = async (
     item: string,
@@ -316,15 +323,17 @@ export const BudgetProvider: React.FC<{ children: React.ReactNode }> = ({
     id: number,
     source: string,
     amount: number,
-    scope?: EditScope
-  ) => refreshAfter(updateIncome(id, source, amount, scope))
+    scope?: EditScope,
+    date?: string
+  ) => refreshAfter(updateIncome(id, source, amount, scope, date))
   const editExpense = (
     id: number,
     item: string,
     amount: number,
     categoryId: number | null,
-    scope?: EditScope
-  ) => refreshAfter(updateExpense(id, item, amount, categoryId, scope))
+    scope?: EditScope,
+    date?: string
+  ) => refreshAfter(updateExpense(id, item, amount, categoryId, scope, date))
 
   return (
     <BudgetContext.Provider

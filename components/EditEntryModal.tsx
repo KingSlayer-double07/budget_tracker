@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react"
 import { Alert, Modal, Pressable, ScrollView, Text, View } from "react-native"
 import { Category, EditScope } from "../services/database"
 import { CategoryChips } from "./CategoryPicker"
+import DateField from "./DateField"
 import { Button, Field } from "./ui"
 import { useModalStyles } from "./ConfirmationModal"
 import { makeStyles } from "../theme"
@@ -10,6 +11,8 @@ export interface EntryValues {
   name: string
   amount: number
   categoryId: number | null
+  // YYYY-MM-DD; only the entry itself has one, not its future months
+  date?: string
 }
 
 interface EditEntryModalProps {
@@ -55,6 +58,7 @@ export default function EditEntryModal({
   const [name, setName] = useState("")
   const [amount, setAmount] = useState("")
   const [categoryId, setCategoryId] = useState<number | null>(null)
+  const [date, setDate] = useState<string | null>(null)
   const modalStyles = useModalStyles()
   const styles = useStyles()
 
@@ -63,6 +67,7 @@ export default function EditEntryModal({
     setName(values.name)
     setAmount(String(values.amount))
     setCategoryId(values.categoryId)
+    setDate(values.date ?? null)
   }
 
   // The modal stays mounted, so reset the form each time it opens. Repeating
@@ -92,7 +97,15 @@ export default function EditEntryModal({
       Alert.alert("Error", "Please enter a valid amount")
       return
     }
-    onSave({ name: name.trim(), amount: numAmount, categoryId }, scope)
+    onSave(
+      {
+        name: name.trim(),
+        amount: numAmount,
+        categoryId,
+        date: scope === "entry" ? date ?? undefined : undefined,
+      },
+      scope
+    )
   }
 
   return (
@@ -150,6 +163,14 @@ export default function EditEntryModal({
               keyboardType="numeric"
               selectTextOnFocus
             />
+            {scope === "entry" && date && (
+              <DateField
+                label="Date"
+                value={date}
+                onChange={(value) => value && setDate(value)}
+                maximumDate={new Date()}
+              />
+            )}
             {categories && (
               <>
                 <Text style={styles.label}>Category</Text>

@@ -7,11 +7,20 @@ import {
   clearAllData,
   checkBudgetThreshold,
   BUDGET_ALERT_MONTH_KEY,
+  toLocalDateString,
 } from "../services/database"
 import { useAuth } from "../context/AuthContext"
 import CategoryManager from "../components/CategoryManager"
 import { Button, Card, Field } from "../components/ui"
-import { makeStyles, useTheme } from "../theme"
+import {
+  canUndoRestore,
+  getLastBackupDate,
+  pickBackup,
+  restoreBackup,
+  shareBackup,
+  undoRestore,
+} from "../services/backup"
+import { formatDate, makeStyles, useTheme } from "../theme"
 
 export default function SettingsScreen() {
   const [biometricEnabled, setBiometricEnabled] = useState(false)
@@ -19,6 +28,11 @@ export default function SettingsScreen() {
   const [budgetThreshold, setBudgetThreshold] = useState("")
   const [hasPasscode, setHasPasscode] = useState(false)
   const [newPasscode, setNewPasscode] = useState("")
+  // ISO time of the last exported backup, or null if never
+  const [lastBackup, setLastBackup] = useState<string | null>(null)
+  const [undoAvailable, setUndoAvailable] = useState(false)
+  // Disables the backup buttons while one is running
+  const [backupBusy, setBackupBusy] = useState(false)
   const { refreshData } = useBudget()
   const authService = AuthenticationService.getInstance()
   // The passcode prompt is rendered once by the root layout
@@ -64,6 +78,9 @@ export default function SettingsScreen() {
       const threshold = await secureStorage.getSecureItem("budget_threshold")
       // No alerts until a monthly budget is set
       setBudgetThreshold(threshold ?? "")
+
+      setLastBackup(await getLastBackupDate())
+      setUndoAvailable(canUndoRestore())
 
       //Load Passcode
       const hasPasscode = await authService.hasPasscode()
@@ -163,6 +180,100 @@ export default function SettingsScreen() {
       },
     ])
   }
+
+  // Run a backup action, keeping the buttons disabled until it finishes
+  const withBackupBusy = async (action: () => Promise<void>) => {
+    setBackupBusy(true)
+    try {
+      await action()
+    } finally {
+      setBackupBusy(false)
+    }
+  }
+
+  const handleExport = () =>
+    withBackupBusy(async () => {
+      try {
+        await shareBackup()
+        setLastBackup(await getLastBackupDate())
+      } catch (error) {
+        console.error("Error exporting backup:", error)
+        Alert.alert("Error", "The backup couldn't be created. Please try again.")
+      }
+    })
+
+  // After a restore or undo, reload everything that shows the data
+  const reloadAfterRestore = async (message: string) => {
+    await refreshData()
+    await loadSettings()
+    Alert.alert("Done", message)
+  }
+
+  const handleRestore = () =>
+    withBackupBusy(async () => {
+      let picked
+      try {
+        picked = await pickBackup()
+      } catch (error) {
+        console.error("Error opening backup:", error)
+        Alert.alert("Error", "The file couldn't be opened.")
+        return
+      }
+      if (!picked) return
+      if (!picked.ok) {
+        Alert.alert("Can't restore this file", picked.error)
+        return
+      }
+      const backup = picked.data
+      const counts = `${backup.tables.income?.length ?? 0} income and ${backup.tables.expenses?.length ?? 0} expense entries`
+      Alert.alert(
+        "Restore backup?",
+        `This backup is from ${formatTimestamp(backup.exportedAt)} and has ${counts}. Everything in the app now will be replaced by it. You can undo this afterwards from here.`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Restore",
+            style: "destructive",
+            onPress: () =>
+              withBackupBusy(async () => {
+                const error = await restoreBackup(backup)
+                if (error) {
+                  Alert.alert("Restore failed", error)
+                  return
+                }
+                await reloadAfterRestore("Your backup has been restored.")
+              }),
+          },
+        ]
+      )
+    })
+
+  const handleUndoRestore = () => {
+    Alert.alert(
+      "Undo last restore?",
+      "This puts back the data you had before the last restore. Anything added since the restore will be lost.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Undo Restore",
+          style: "destructive",
+          onPress: () =>
+            withBackupBusy(async () => {
+              const error = await undoRestore()
+              if (error) {
+                Alert.alert("Undo failed", error)
+                return
+              }
+              await reloadAfterRestore("Your data from before the restore is back.")
+            }),
+        },
+      ]
+    )
+  }
+
+  // Local date of an ISO timestamp, e.g. "27 Nov 2026"
+  const formatTimestamp = (iso: string) =>
+    formatDate(toLocalDateString(new Date(iso)))
 
   const handleClearDatabase = async () => {
     Alert.alert(
@@ -285,6 +396,41 @@ export default function SettingsScreen() {
             )}
           </Card>
 
+          <Text style={styles.groupLabel}>Backup</Text>
+          <Card style={styles.card}>
+            <Text style={styles.settingHint}>
+              Your data only lives on this phone. Export a backup now and then
+              and save it somewhere safe, like Google Drive, so you can restore
+              it if you lose or change phones.
+            </Text>
+            <Text style={styles.backupStatus}>
+              {lastBackup
+                ? `Last backup: ${formatTimestamp(lastBackup)}`
+                : "You haven't made a backup yet."}
+            </Text>
+            <Button
+              title="Export Backup"
+              onPress={handleExport}
+              disabled={backupBusy}
+            />
+            <Button
+              title="Restore from Backup"
+              variant="secondary"
+              onPress={handleRestore}
+              disabled={backupBusy}
+              style={styles.secondaryButton}
+            />
+            {undoAvailable && (
+              <Pressable
+                onPress={handleUndoRestore}
+                disabled={backupBusy}
+                hitSlop={8}
+                style={styles.linkButton}>
+                <Text style={styles.dangerLink}>Undo last restore</Text>
+              </Pressable>
+            )}
+          </Card>
+
           <Text style={styles.groupLabel}>Data</Text>
           <Card style={styles.card}>
             <Text style={styles.settingHint}>
@@ -361,6 +507,16 @@ const useStyles = makeStyles(({ colors, spacing, font }) => ({
   },
   dangerButton: {
     marginTop: spacing.md,
+  },
+  backupStatus: {
+    fontSize: font.label,
+    fontWeight: "600",
+    color: colors.text,
+    marginTop: spacing.md,
+    marginBottom: spacing.md,
+  },
+  secondaryButton: {
+    marginTop: spacing.sm,
   },
   authContainer: {
     alignItems: "center",

@@ -618,3 +618,191 @@ describe("editing entries", () => {
     expect((await allRows("expenses"))[0].next_category_id).toBeNull()
   })
 })
+
+describe("back-dating entries", () => {
+  it("stores the chosen date and rejects future or invalid ones", async () => {
+    expect(
+      await database.addExpense("Fuel", 20000, false, "", null, "2026-10-03")
+    ).toBe(true)
+    expect(await database.addIncome("Gift", 5000, false, "", "2026-11-26")).toBe(
+      true
+    )
+    expect(
+      await database.addExpense("Later", 100, false, "", null, "2026-11-27")
+    ).toBe(false)
+    expect(
+      await database.addExpense("Typo", 100, false, "", null, "2026-02-30")
+    ).toBe(false)
+
+    expect((await allRows("expenses")).map((row) => row.date)).toEqual([
+      "2026-10-03",
+    ])
+    expect((await allRows("income"))[0].date).toBe("2026-11-26")
+    expect(alertSpy).toHaveBeenCalledTimes(2)
+  })
+
+  it("fills in the months since a back-dated repeating entry", async () => {
+    await database.addExpense("Rent", 100000, true, "1", null, "2026-09-01")
+    await database.handleRecurringUpdates()
+    expect((await allRows("expenses")).map((row) => row.date)).toEqual([
+      "2026-09-01",
+      "2026-10-01",
+      "2026-11-01",
+    ])
+  })
+
+  it("moves an entry's date when edited, but not for future months", async () => {
+    await database.addIncome("Bonus", 50000, false, "")
+    const [bonus] = await allRows("income")
+    await database.updateIncome(bonus.id, "Bonus", 50000, "entry", "2026-11-02")
+    expect((await allRows("income"))[0].date).toBe("2026-11-02")
+
+    setToday(new Date(2026, 9, 26, 9))
+    await database.addExpense("Gym", 15000, true, "26")
+    setToday(new Date(2026, 10, 26, 12))
+    const [gym] = await allRows("expenses")
+    await database.updateExpense(gym.id, "Gym", 18000, null, "future", "2026-01-01")
+    expect((await allRows("expenses"))[0].date).toBe("2026-10-26")
+  })
+})
+
+describe("backups", () => {
+  const storeItem = (key: string) =>
+    require("expo-secure-store").__store.get(key) ?? null
+
+  // A spread of data touching every table
+  const fillSampleData = async () => {
+    await database.addCategory("Church")
+    const church = (await database.getCategories()).find(
+      (c) => c.name === "Church"
+    )!.id
+    await database.addIncome("Salary", 300000, true, "25", "2026-10-25")
+    await database.addExpense("Tithe", 30000, false, "", church, "2026-11-02")
+    await database.addExpense("Gym", 15000, true, "5", null, "2026-11-05")
+    const [, gym] = await allRows("expenses")
+    await database.updateExpense(gym.id, "Gym", 18000, null, "future")
+    await database.addPlannedPurchase("Laptop", 900000, "2027-01-15")
+    await require("expo-secure-store").setItemAsync(
+      database.BUDGET_THRESHOLD_KEY,
+      "250000"
+    )
+  }
+
+  const snapshot = async () => ({
+    income: await allRows("income"),
+    expenses: await database.getExpenses(),
+    planned: await database.getPlannedPurchases(),
+    categories: await database.getCategories(),
+  })
+
+  it("restores exactly what was exported, replacing what's there", async () => {
+    await fillSampleData()
+    const before = await snapshot()
+    // Through JSON, as it goes through the backup file
+    const backup = JSON.parse(JSON.stringify(await database.exportData()))
+
+    // Change everything after the backup
+    await database.clearAllData()
+    await database.addExpense("Not in the backup", 1, false, "")
+    await database.deleteCategory(before.categories[0].id)
+    await require("expo-secure-store").deleteItemAsync(
+      database.BUDGET_THRESHOLD_KEY
+    )
+    await require("expo-secure-store").setItemAsync(
+      database.BUDGET_ALERT_MONTH_KEY,
+      "2026-11"
+    )
+
+    expect(await database.restoreData(backup)).toBeNull()
+    expect(await snapshot()).toEqual(before)
+    expect(storeItem(database.BUDGET_THRESHOLD_KEY)).toBe("250000")
+    // The budget alert can fire again for the restored data
+    expect(storeItem(database.BUDGET_ALERT_MONTH_KEY)).toBeNull()
+
+    // Ids continue after the restored ones
+    await database.addExpense("New", 1, false, "")
+    const ids = (await allRows("expenses")).map((row) => row.id)
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it("rejects files that aren't usable backups, changing nothing", async () => {
+    await fillSampleData()
+    const before = await snapshot()
+    const good = await database.exportData()
+
+    const bad: unknown[] = [
+      null,
+      { hello: "world" },
+      { ...good, version: database.BACKUP_VERSION + 1 },
+      { ...good, tables: undefined },
+      { ...good, tables: { ...good.tables, income: "nope" } },
+      { ...good, tables: { ...good.tables, expenses: [{ item: "No id" }] } },
+      {
+        ...good,
+        tables: { ...good.tables, expenses: [{ id: 1, item: { nested: 1 } }] },
+      },
+    ]
+    for (const data of bad) {
+      expect(await database.restoreData(data)).toEqual(expect.any(String))
+    }
+    expect(await snapshot()).toEqual(before)
+  })
+
+  it("rolls back a restore that fails part way", async () => {
+    await fillSampleData()
+    const before = await snapshot()
+    const backup = await database.exportData()
+    // Valid shape, but income needs an amount, so the insert fails
+    backup.tables.income = [{ id: 1, source: "Broken", date: "2026-11-01" }]
+
+    expect(await database.restoreData(backup)).toMatch(/left as it was/)
+    expect(await snapshot()).toEqual(before)
+  })
+
+  it("restores backups from older versions with fewer columns", async () => {
+    const old = {
+      format: database.BACKUP_FORMAT,
+      version: 1,
+      exportedAt: "2026-06-01T10:00:00.000Z",
+      settings: { monthlyBudget: null },
+      tables: {
+        categories: [{ id: 1, name: "Food" }],
+        income: [
+          {
+            id: 1,
+            source: "Salary",
+            amount: 250000,
+            date: "2026-05-25",
+            is_recurring: 0,
+            recurring_date: null,
+          },
+        ],
+        // No category_id, last_processed or next_* columns yet
+        expenses: [
+          {
+            id: 1,
+            item: "Bread",
+            amount: 1200,
+            date: "2026-05-26",
+            is_recurring: 0,
+            recurring_date: null,
+          },
+        ],
+        planned_purchases: [],
+        // No savings table in the file at all
+      },
+    }
+
+    expect(await database.restoreData(old)).toBeNull()
+    expect((await database.getCategories()).map((c) => c.name)).toEqual(["Food"])
+    expect(await database.getExpenses()).toEqual([
+      expect.objectContaining({
+        item: "Bread",
+        category_id: null,
+        category_name: null,
+        next_amount: null,
+      }),
+    ])
+    expect(await database.getTotalIncome()).toBe(250000)
+  })
+})

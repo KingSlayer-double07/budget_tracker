@@ -7,12 +7,14 @@ import {
   clearExpensesTable,
   UNCATEGORIZED,
   EditScope,
+  toLocalDateString,
 } from "../../services/database"
 import { NotificationService } from "../../services/NotificationService"
 import ConfirmationModal from "../../components/ConfirmationModal"
 import { CategoryChips } from "../../components/CategoryPicker"
 import EditEntryModal, { EntryValues } from "../../components/EditEntryModal"
 import TransactionRow from "../../components/TransactionRow"
+import DateField from "../../components/DateField"
 import {
   Button,
   Card,
@@ -22,7 +24,7 @@ import {
   LoadingState,
   SectionTitle,
 } from "../../components/ui"
-import { formatNaira, makeStyles, useTheme } from "../../theme"
+import { formatDate, formatNaira, makeStyles, useTheme } from "../../theme"
 
 interface ExpenseEntry {
   id: number
@@ -63,6 +65,8 @@ export default function AddExpenseScreen() {
   const [isRecurring, setIsRecurring] = useState(false)
   const [recurringDate, setRecurringDate] = useState("")
   const [categoryId, setCategoryId] = useState<number | null>(null)
+  // YYYY-MM-DD when back-dated; null means today, worked out when saving
+  const [date, setDate] = useState<string | null>(null)
   // Expense being edited from the history list
   const [editing, setEditing] = useState<ExpenseEntry | null>(null)
   const [showCancelModal, setShowCancelModal] = useState(false)
@@ -100,7 +104,8 @@ export default function AddExpenseScreen() {
         numAmount,
         isRecurring,
         recurringDate,
-        categoryId
+        categoryId,
+        date ?? undefined
       )
       if (success) {
         // Schedule notification for recurring expense if date is provided
@@ -131,6 +136,7 @@ export default function AddExpenseScreen() {
         setIsRecurring(false)
         setRecurringDate("")
         setCategoryId(null)
+        setDate(null)
       } else {
         Alert.alert("Error", "Failed to add expense. Please try again.")
       }
@@ -215,7 +221,8 @@ export default function AddExpenseScreen() {
       values.name,
       values.amount,
       values.categoryId,
-      scope
+      scope,
+      values.date
     )
     if (!success) {
       Alert.alert("Error", "Failed to save the changes. Please try again.")
@@ -275,6 +282,14 @@ export default function AddExpenseScreen() {
           onChangeText={setAmount}
           keyboardType="numeric"
         />
+        <DateField
+          label="Date"
+          value={date ?? toLocalDateString(new Date())}
+          onChange={(value) =>
+            setDate(value === toLocalDateString(new Date()) ? null : value)
+          }
+          maximumDate={new Date()}
+        />
         <Text style={styles.label}>Category</Text>
         <View style={styles.categoryPicker}>
           <CategoryChips
@@ -300,7 +315,11 @@ export default function AddExpenseScreen() {
             onChangeText={setRecurringDate}
             keyboardType="numeric"
             maxLength={2}
-            hint="Days 29-31 fall on the last day of shorter months"
+            hint={
+              date && date < toLocalDateString(new Date())
+                ? `Every month since ${formatDate(date)} is recorded too`
+                : "Days 29-31 fall on the last day of shorter months"
+            }
           />
         )}
         <Button
@@ -371,6 +390,7 @@ export default function AddExpenseScreen() {
           name: editing?.item ?? "",
           amount: editing?.amount ?? 0,
           categoryId: editing?.category_id ?? null,
+          date: editing?.date,
         }}
         future={
           editing?.is_recurring ? futureValues(editing) : undefined

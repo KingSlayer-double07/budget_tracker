@@ -1,5 +1,4 @@
 import * as SQLite from "expo-sqlite"
-import * as FileSystem from "expo-file-system"
 import { Alert } from "react-native"
 import { SecureStorageService } from "./SecureStorageService"
 import { NotificationService } from "./NotificationService"
@@ -179,7 +178,7 @@ const validateDayOfMonth = (day: string): ValidationResult => {
 }
 
 // Format a date as YYYY-MM-DD in local time (toISOString uses UTC)
-const toLocalDateString = (date: Date): string => {
+export const toLocalDateString = (date: Date): string => {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, "0")
   const day = String(date.getDate()).padStart(2, "0")
@@ -631,12 +630,17 @@ export const getBalance = async (): Promise<number> => {
   return income - expenses
 }
 
+// `date` (YYYY-MM-DD) defaults to today. A repeating entry dated in the past
+// has the months since then filled in by the next handleRecurringUpdates.
 export const addIncome = async (
   source: string,
   amount: number,
   isRecurring: boolean,
-  recurringDate: string
+  recurringDate: string,
+  date?: string
 ): Promise<boolean> => {
+  if (!validateEntryDate(date)) return false
+
   // Validate inputs
   const sourceValidation = validateString(source, "Source")
   if (!sourceValidation.isValid) {
@@ -660,13 +664,13 @@ export const addIncome = async (
 
   return (
     (await safeDatabaseOperation(async (db) => {
-      const date = toLocalDateString(new Date())
+      const entryDate = date ?? toLocalDateString(new Date())
       const recurringDates = isRecurring ? recurringDate : null
 
       await db.runAsync(
         `INSERT INTO income (source, amount, date, is_recurring, recurring_date) 
        VALUES (?, ?, ?, ?, ?);`,
-        [source.trim(), amount, date, isRecurring ? 1 : 0, recurringDates]
+        [source.trim(), amount, entryDate, isRecurring ? 1 : 0, recurringDates]
       )
 
       return true
@@ -674,13 +678,17 @@ export const addIncome = async (
   )
 }
 
+// `date` works as for addIncome
 export const addExpense = async (
   item: string,
   amount: number,
   isRecurring: boolean,
   recurringDate: string,
-  categoryId: number | null = null
+  categoryId: number | null = null,
+  date?: string
 ): Promise<boolean> => {
+  if (!validateEntryDate(date)) return false
+
   // Validate inputs
   const itemValidation = validateString(item, "Item name")
   if (!itemValidation.isValid) {
@@ -704,7 +712,7 @@ export const addExpense = async (
 
   return (
     (await safeDatabaseOperation(async (db) => {
-      const date = toLocalDateString(new Date())
+      const entryDate = date ?? toLocalDateString(new Date())
       const recurringDates = isRecurring ? recurringDate : null
 
       await db.runAsync(
@@ -712,7 +720,7 @@ export const addExpense = async (
         [
           item.trim(),
           amount,
-          date,
+          entryDate,
           isRecurring ? 1 : 0,
           recurringDates,
           categoryId,
@@ -754,6 +762,17 @@ export const deleteExpense = async (key: number): Promise<boolean> => {
   )
 }
 
+// Entries can be dated today or earlier; alerts when the date is invalid
+const validateEntryDate = (date: string | undefined) => {
+  if (date === undefined) return true
+  const result = validateFullDate(date)
+  if (!result.isValid) {
+    Alert.alert("Validation Error", result.error)
+    return false
+  }
+  return true
+}
+
 // Validate an edited name and amount, alerting on the first problem
 const validateEdit = (name: string, nameLabel: string, amount: number) => {
   for (const result of [validateString(name, nameLabel), validateAmount(amount)]) {
@@ -772,13 +791,16 @@ const validateEdit = (name: string, nameLabel: string, amount: number) => {
 export type EditScope = "entry" | "future"
 
 // Change an income entry's source and amount
+// `date` (YYYY-MM-DD) moves the entry itself, so it's ignored for "future"
 export const updateIncome = async (
   id: number,
   source: string,
   amount: number,
-  scope: EditScope = "entry"
+  scope: EditScope = "entry",
+  date?: string
 ): Promise<boolean> => {
   if (!validateEdit(source, "Source", amount)) return false
+  if (!validateEntryDate(date)) return false
   return (
     (await safeDatabaseOperation(async (db) => {
       const entry = await db.getFirstAsync<Income>(
@@ -796,9 +818,9 @@ export const updateIncome = async (
         )
       } else {
         await db.runAsync(
-          `UPDATE income SET source = ?, amount = ?, next_name = NULL,
-           next_amount = NULL WHERE id = ?`,
-          [name, amount, id]
+          `UPDATE income SET source = ?, amount = ?, date = COALESCE(?, date),
+           next_name = NULL, next_amount = NULL WHERE id = ?`,
+          [name, amount, date ?? null, id]
         )
       }
       return true
@@ -807,14 +829,17 @@ export const updateIncome = async (
 }
 
 // Change an expense's name, amount and category
+// `date` works as for updateIncome
 export const updateExpense = async (
   id: number,
   item: string,
   amount: number,
   categoryId: number | null,
-  scope: EditScope = "entry"
+  scope: EditScope = "entry",
+  date?: string
 ): Promise<boolean> => {
   if (!validateEdit(item, "Item name", amount)) return false
+  if (!validateEntryDate(date)) return false
   return (
     (await safeDatabaseOperation(async (db) => {
       const entry = await db.getFirstAsync<Expense>(
@@ -837,9 +862,9 @@ export const updateExpense = async (
       } else {
         await db.runAsync(
           `UPDATE expenses SET item = ?, amount = ?, category_id = ?,
-           next_name = NULL, next_amount = NULL, next_category_id = NULL
-           WHERE id = ?`,
-          [name, amount, categoryId, id]
+           date = COALESCE(?, date), next_name = NULL, next_amount = NULL,
+           next_category_id = NULL WHERE id = ?`,
+          [name, amount, categoryId, date ?? null, id]
         )
       }
       return true
@@ -1174,6 +1199,140 @@ export const clearAllData = async (): Promise<boolean> => {
       return true
     })) || false
   )
+}
+
+// ---- Backups ----
+
+export const BACKUP_FORMAT = "budget-tracker-backup"
+export const BACKUP_VERSION = 1
+
+// Restored in this order, so categories exist before expenses refer to them
+const BACKUP_TABLES = [
+  "categories",
+  "income",
+  "expenses",
+  "planned_purchases",
+  "savings",
+] as const
+type BackupTable = (typeof BACKUP_TABLES)[number]
+type BackupRow = Record<string, string | number | null>
+
+export interface BackupData {
+  format: typeof BACKUP_FORMAT
+  version: number
+  exportedAt: string
+  settings: { monthlyBudget: string | null }
+  tables: Record<BackupTable, BackupRow[]>
+}
+
+// Everything the app stores about your money, for writing to a backup file.
+// The passcode and lock settings are left out on purpose.
+export const exportData = async (): Promise<BackupData> => {
+  const database = await getDatabase()
+  const tables = {} as Record<BackupTable, BackupRow[]>
+  for (const table of BACKUP_TABLES) {
+    tables[table] = await database.getAllAsync<BackupRow>(
+      `SELECT * FROM ${table} ORDER BY id`
+    )
+  }
+  return {
+    format: BACKUP_FORMAT,
+    version: BACKUP_VERSION,
+    exportedAt: new Date().toISOString(),
+    settings: {
+      monthlyBudget: await SecureStorageService.getInstance().getSecureItem(
+        BUDGET_THRESHOLD_KEY
+      ),
+    },
+    tables,
+  }
+}
+
+// Check that parsed JSON is a backup this version of the app can restore;
+// returns a message describing the problem, or null when it's fine
+export const checkBackup = (data: unknown): string | null => {
+  const backup = data as Partial<BackupData> | null
+  if (!backup || typeof backup !== "object" || backup.format !== BACKUP_FORMAT) {
+    return "This file isn't a Budget Tracker backup."
+  }
+  if (typeof backup.version !== "number" || backup.version > BACKUP_VERSION) {
+    return "This backup was made by a newer version of the app. Update the app and try again."
+  }
+  if (!backup.tables || typeof backup.tables !== "object") {
+    return "This backup is damaged: it has no data."
+  }
+  for (const table of BACKUP_TABLES) {
+    const rows = (backup.tables as Record<string, unknown>)[table]
+    if (rows === undefined) continue
+    const valid =
+      Array.isArray(rows) &&
+      rows.every(
+        (row) =>
+          row &&
+          typeof row === "object" &&
+          typeof (row as BackupRow).id === "number" &&
+          Object.values(row).every(
+            (value) =>
+              value === null ||
+              typeof value === "string" ||
+              typeof value === "number"
+          )
+      )
+    if (!valid) return `This backup is damaged: its ${table} can't be read.`
+  }
+  return null
+}
+
+// Replace everything stored with the contents of a backup. Nothing changes
+// unless the whole restore succeeds. Returns an error message, or null.
+export const restoreData = async (data: unknown): Promise<string | null> => {
+  const problem = checkBackup(data)
+  if (problem) return problem
+  const backup = data as BackupData
+
+  const database = await getDatabase()
+  await database.execAsync("BEGIN TRANSACTION")
+  try {
+    // Expenses first, so no category is removed while still referred to
+    for (const table of [...BACKUP_TABLES].reverse()) {
+      await database.runAsync(`DELETE FROM ${table}`)
+    }
+    for (const table of BACKUP_TABLES) {
+      // Only columns this version of the app has, so older backups (with
+      // fewer columns) restore with the rest left at their defaults
+      const columns = new Set(
+        (
+          await database.getAllAsync<{ name: string }>(
+            `SELECT name FROM pragma_table_info('${table}')`
+          )
+        ).map((column) => column.name)
+      )
+      for (const row of backup.tables[table] ?? []) {
+        const keys = Object.keys(row).filter((key) => columns.has(key))
+        await database.runAsync(
+          `INSERT INTO ${table} (${keys.join(", ")})
+           VALUES (${keys.map(() => "?").join(", ")})`,
+          keys.map((key) => row[key])
+        )
+      }
+    }
+    await database.execAsync("COMMIT")
+  } catch (error) {
+    await database.execAsync("ROLLBACK")
+    console.error("Failed to restore backup:", error)
+    return "The backup couldn't be restored, so your data was left as it was."
+  }
+
+  // The budget comes back too; its alert can fire again for this month
+  const storage = SecureStorageService.getInstance()
+  const budget = backup.settings?.monthlyBudget
+  if (typeof budget === "string" && budget) {
+    await storage.saveSecureItem(BUDGET_THRESHOLD_KEY, budget)
+  } else {
+    await storage.deleteSecureItem(BUDGET_THRESHOLD_KEY)
+  }
+  await storage.deleteSecureItem(BUDGET_ALERT_MONTH_KEY)
+  return null
 }
 
 // Initialize database when the module is imported

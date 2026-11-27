@@ -1,10 +1,16 @@
 import React, { useState } from "react"
 import { View, Text, Switch, FlatList, Alert, Pressable } from "react-native"
 import { useBudget } from "../../context/BudgetContext"
-import { stopRecurring, getNextDueDate, clearIncomeTable } from "../../services/database"
+import {
+  stopRecurring,
+  getNextDueDate,
+  clearIncomeTable,
+  EditScope,
+} from "../../services/database"
 import { NotificationService } from "../../services/NotificationService"
 import ConfirmationModal from "../../components/ConfirmationModal"
 import TransactionRow from "../../components/TransactionRow"
+import EditEntryModal, { EntryValues } from "../../components/EditEntryModal"
 import {
   Button,
   Card,
@@ -23,7 +29,24 @@ interface IncomeEntry {
   date: string
   is_recurring: boolean
   recurring_date: string | null
+  // Set when a repeating entry was edited for future months only
+  next_name: string | null
+  next_amount: number | null
 }
+
+// What a repeating income entry records in later months
+const futureValues = (income: IncomeEntry): EntryValues => ({
+  name:
+    income.next_amount !== null
+      ? income.next_name ?? income.source
+      : income.source,
+  amount: income.next_amount ?? income.amount,
+  categoryId: null,
+})
+
+// The monthly reminder is keyed by the name later months record
+const reminderId = (name: string, day: string | null) =>
+  `recurring-income-${name}-${day}`
 
 export default function AddIncomeScreen() {
   const [source, setSource] = useState("")
@@ -34,6 +57,8 @@ export default function AddIncomeScreen() {
   const [selectedIncome, setSelectedIncome] = useState<IncomeEntry | null>(
     null
   )
+  // Entry being edited from the history list
+  const [editing, setEditing] = useState<IncomeEntry | null>(null)
   const {
     incomeList,
     isLoading,
@@ -41,6 +66,7 @@ export default function AddIncomeScreen() {
     addNewIncome,
     refreshData,
     deleteSelectedIncome,
+    editIncome,
   } = useBudget()
   const styles = useStyles()
   const { colors } = useTheme()
@@ -77,7 +103,7 @@ export default function AddIncomeScreen() {
             "Recurring Income Due",
             `Your recurring income of ${formatNaira(numAmount)} from ${source} is due next on ${nextDate.toLocaleDateString()}`,
             nextDate,
-            `recurring-income-${source}-${recurringDate}`,
+            reminderId(source.trim(), recurringDate),
             source,
             {
               table: "income",
@@ -156,12 +182,52 @@ export default function AddIncomeScreen() {
       const notificationService = NotificationService.getInstance()
       await notificationService.cancelFutureOccurrences(
         selectedIncome.source,
-        `recurring-income-${selectedIncome.source}-${selectedIncome.recurring_date}`
+        reminderId(
+          futureValues(selectedIncome).name,
+          selectedIncome.recurring_date
+        )
       )
       setShowCancelModal(false)
       setSelectedIncome(null)
     } catch (error) {
       Alert.alert("Error", "Failed to cancel future occurrences")
+    }
+  }
+
+  const handleSaveEdit = async (values: EntryValues, scope: EditScope) => {
+    if (!editing) return
+    const income = editing
+    const success = await editIncome(
+      income.id,
+      values.name,
+      values.amount,
+      scope
+    )
+    if (!success) {
+      Alert.alert("Error", "Failed to save the changes. Please try again.")
+      return
+    }
+    setEditing(null)
+
+    // Keep the monthly reminder in step with the name later months record
+    const oldName = futureValues(income).name
+    if (income.is_recurring && income.recurring_date && oldName !== values.name) {
+      try {
+        await NotificationService.getInstance().renameRecurringReminder(
+          reminderId(oldName, income.recurring_date),
+          "Recurring Income Due",
+          getNextDueDate(parseInt(income.recurring_date)),
+          reminderId(values.name, income.recurring_date),
+          values.name,
+          {
+            table: "income",
+            name: values.name,
+            recurringDay: income.recurring_date,
+          }
+        )
+      } catch (error) {
+        console.error("Failed to update the reminder:", error)
+      }
     }
   }
 
@@ -240,7 +306,8 @@ export default function AddIncomeScreen() {
       />
       {incomeList.length > 0 && (
         <Text style={styles.hint}>
-          Hold a repeating entry to stop it · Swipe left to delete
+          Tap to edit · Hold a repeating entry to stop it · Swipe left to
+          delete
         </Text>
       )}
     </View>
@@ -262,10 +329,28 @@ export default function AddIncomeScreen() {
             kind="income"
             date={item.date}
             recurringDay={item.is_recurring ? item.recurring_date : null}
+            nextAmount={item.is_recurring ? item.next_amount : null}
+            onPress={() => setEditing(item)}
             onLongPress={() => handleLongPress(item)}
             onDelete={() => handleDelete(item)}
           />
         )}
+      />
+
+      <EditEntryModal
+        visible={editing !== null}
+        title="Edit Income"
+        nameLabel="Where is it from?"
+        initial={{
+          name: editing?.source ?? "",
+          amount: editing?.amount ?? 0,
+          categoryId: null,
+        }}
+        future={
+          editing?.is_recurring ? futureValues(editing) : undefined
+        }
+        onSave={handleSaveEdit}
+        onCancel={() => setEditing(null)}
       />
 
       <ConfirmationModal

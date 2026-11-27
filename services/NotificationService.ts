@@ -142,43 +142,80 @@ export class NotificationService {
         identifier: `${identifier}-added`,
       })
 
-      // Get the day of the month from the recurring date. The monthly trigger
-      // rejects days past the end of the current month, so days 29-31 are
-      // capped to this month's last day.
-      const now = new Date()
-      const daysInMonth = new Date(
-        now.getFullYear(),
-        now.getMonth() + 1,
-        0
-      ).getDate()
-      const dayOfMonth = Math.min(recurringDate.getDate(), daysInMonth)
-
-      // Schedule the recurring notification for 9:00 AM on that day every month
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title,
-          body: `Your recurring transaction "${description}" is due today`,
-          sound: true,
-          data: {
-            type: "RECURRING_TRANSACTION",
-            identifier,
-            ...target,
-          },
-          categoryIdentifier: RECURRING_CATEGORY,
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.MONTHLY,
-          day: dayOfMonth,
-          hour: 9,
-          minute: 0,
-          channelId: "recurring-transactions",
-        },
-        identifier: `${identifier}-recurring`,
-      })
+      await this.scheduleMonthlyReminder(
+        title,
+        recurringDate,
+        identifier,
+        description,
+        target
+      )
     } catch (error) {
       console.error("Error in scheduleRecurringTransaction:", error)
       throw error
     }
+  }
+
+  // Move a recurring entry's monthly reminder after its name changes, so the
+  // reminder text and its Stop recurring action match what's recorded
+  public async renameRecurringReminder(
+    oldIdentifier: string,
+    title: string,
+    recurringDate: Date,
+    identifier: string,
+    description: string,
+    target: RecurringTarget
+  ): Promise<void> {
+    await this.cancelNotification(`${oldIdentifier}-recurring`)
+    await this.scheduleMonthlyReminder(
+      title,
+      recurringDate,
+      identifier,
+      description,
+      target
+    )
+  }
+
+  // Schedule the monthly "due today" reminder for a recurring entry
+  private async scheduleMonthlyReminder(
+    title: string,
+    recurringDate: Date,
+    identifier: string,
+    description: string,
+    target: RecurringTarget
+  ): Promise<void> {
+    // Get the day of the month from the recurring date. The monthly trigger
+    // rejects days past the end of the current month, so days 29-31 are
+    // capped to this month's last day.
+    const now = new Date()
+    const daysInMonth = new Date(
+      now.getFullYear(),
+      now.getMonth() + 1,
+      0
+    ).getDate()
+    const dayOfMonth = Math.min(recurringDate.getDate(), daysInMonth)
+
+    // Schedule the recurring notification for 9:00 AM on that day every month
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body: `Your recurring transaction "${description}" is due today`,
+        sound: true,
+        data: {
+          type: "RECURRING_TRANSACTION",
+          identifier,
+          ...target,
+        },
+        categoryIdentifier: RECURRING_CATEGORY,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.MONTHLY,
+        day: dayOfMonth,
+        hour: 9,
+        minute: 0,
+        channelId: "recurring-transactions",
+      },
+      identifier: `${identifier}-recurring`,
+    })
   }
 
   // Cancel future occurrences of a recurring transaction
